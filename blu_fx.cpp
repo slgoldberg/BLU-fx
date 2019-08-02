@@ -65,6 +65,7 @@
 
 enum BLUfxPresets_t
 {
+    PRESET_USER = 0,            // current scratchpad, saved/restored to .ini file
     PRESET_DEFAULT,
     PRESET_POLAROID,
     PRESET_FOGGED_UP,
@@ -108,6 +109,20 @@ typedef BLUfxPreset_t BLUfxPreset;
 
 BLUfxPreset BLUfxPresets [PRESET_MAX] =
 {
+    // PRESET_USER (scratchpad; looks like default, but read from .ini)
+    {
+        // starts out identical to default, but overwritten by LoadSettings()
+        0.0f, // brightness
+        1.0f, // contrast
+        1.0f, // saturation
+        0.0f, // red scale
+        0.0f, // green scale
+        0.0f, // blue scale
+        0.0f, // red offset
+        0.0f, // green offset
+        0.0f, // blue offset
+        0.0f // vignette
+    },
     // PRESET_DEFAULT
     {
         0.0f, // brightness
@@ -396,7 +411,8 @@ BLUfxPreset BLUfxPresets [PRESET_MAX] =
 
 // global settings variables
 static int postProcesssingEnabled = DEFAULT_POST_PROCESSING_ENABLED, fpsLimiterEnabled = DEFAULT_FPS_LIMITER_ENABLED, controlCinemaVeriteEnabled = DEFAULT_CONTROL_CINEMA_VERITE_ENABLED;
-static float maxFps = DEFAULT_MAX_FRAME_RATE, disableCinemaVeriteTime = DEFAULT_DISABLE_CINEMA_VERITE_TIME, brightness = BLUfxPresets[PRESET_DEFAULT].brightness, contrast = BLUfxPresets[PRESET_DEFAULT].contrast, saturation = BLUfxPresets[PRESET_DEFAULT].saturation, redScale = BLUfxPresets[PRESET_DEFAULT].redScale, greenScale = BLUfxPresets[PRESET_DEFAULT].greenScale, blueScale = BLUfxPresets[PRESET_DEFAULT].blueScale, redOffset = BLUfxPresets[PRESET_DEFAULT].redOffset, greenOffset = BLUfxPresets[PRESET_DEFAULT].greenOffset, blueOffset = BLUfxPresets[PRESET_DEFAULT].blueOffset, vignette = BLUfxPresets[PRESET_DEFAULT].vignette, raleighScale = DEFAULT_RALEIGH_SCALE;
+static float maxFps = DEFAULT_MAX_FRAME_RATE, disableCinemaVeriteTime = DEFAULT_DISABLE_CINEMA_VERITE_TIME;
+static float brightness = BLUfxPresets[PRESET_DEFAULT].brightness, contrast = BLUfxPresets[PRESET_DEFAULT].contrast, saturation = BLUfxPresets[PRESET_DEFAULT].saturation, redScale = BLUfxPresets[PRESET_DEFAULT].redScale, greenScale = BLUfxPresets[PRESET_DEFAULT].greenScale, blueScale = BLUfxPresets[PRESET_DEFAULT].blueScale, redOffset = BLUfxPresets[PRESET_DEFAULT].redOffset, greenOffset = BLUfxPresets[PRESET_DEFAULT].greenOffset, blueOffset = BLUfxPresets[PRESET_DEFAULT].blueOffset, vignette = BLUfxPresets[PRESET_DEFAULT].vignette, raleighScale = DEFAULT_RALEIGH_SCALE;
 
 // global internal variables
 static int lastResolutionX = 0, lastResolutionY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVerite = 0;
@@ -408,7 +424,7 @@ static XPLMWindowID fakeWindow = NULL;
 static XPLMDataRef cinemaVeriteDataRef = NULL, viewTypeDataRef = NULL, raleighScaleDataRef = NULL, overrideControlCinemaVeriteDataRef = NULL, ignitionKeyDataRef = NULL;
 
 // global widget variables
-static XPWidgetID settingsWidget = NULL, postProcessingCheckbox = NULL, fpsLimiterCheckbox = NULL, controlCinemaVeriteCheckbox = NULL, brightnessCaption = NULL, contrastCaption = NULL, saturationCaption = NULL, redScaleCaption = NULL, greenScaleCaption = NULL, blueScaleCaption = NULL, redOffsetCaption = NULL, greenOffsetCaption = NULL, blueOffsetCaption = NULL, vignetteCaption = NULL, raleighScaleCaption = NULL, maxFpsCaption = NULL, disableCinemaVeriteTimeCaption, brightnessSlider = NULL, contrastSlider = NULL, saturationSlider = NULL, redScaleSlider = NULL, greenScaleSlider = NULL, blueScaleSlider = NULL, redOffsetSlider = NULL, greenOffsetSlider = NULL, blueOffsetSlider = NULL, vignetteSlider = NULL, raleighScaleSlider = NULL, maxFpsSlider = NULL, disableCinemaVeriteTimeSlider = NULL, presetButtons[PRESET_MAX] = {NULL}, resetRaleighScaleButton = NULL;
+static XPWidgetID settingsWidget = NULL, postProcessingCheckbox = NULL, fpsLimiterCheckbox = NULL, controlCinemaVeriteCheckbox = NULL, brightnessCaption = NULL, contrastCaption = NULL, saturationCaption = NULL, redScaleCaption = NULL, greenScaleCaption = NULL, blueScaleCaption = NULL, redOffsetCaption = NULL, greenOffsetCaption = NULL, blueOffsetCaption = NULL, vignetteCaption = NULL, raleighScaleCaption = NULL, maxFpsCaption = NULL, disableCinemaVeriteTimeCaption, brightnessSlider = NULL, contrastSlider = NULL, saturationSlider = NULL, redScaleSlider = NULL, greenScaleSlider = NULL, blueScaleSlider = NULL, redOffsetSlider = NULL, greenOffsetSlider = NULL, blueOffsetSlider = NULL, vignetteSlider = NULL, raleighScaleSlider = NULL, maxFpsSlider = NULL, disableCinemaVeriteTimeSlider = NULL, presetButtons[PRESET_MAX] = {NULL}, resetRaleighScaleButton = NULL, saveButton = NULL, loadButton = NULL;
 
 // draw-callback that adds post-processing
 static int PostProcessingCallback(XPLMDrawingPhase inPhase, int inIsBefore, void *inRefcon)
@@ -825,6 +841,23 @@ static void LoadSettings(void)
         }
 
         file.close();
+        
+        // saves the initial configuration throughout the session
+        static bool sIsFirstLoad = true;
+        if (sIsFirstLoad) {
+            sIsFirstLoad = false;
+            
+            // copies to User preset attached to Restore button
+            BLUfxPresets[PRESET_USER].brightness = brightness;
+            BLUfxPresets[PRESET_USER].contrast = contrast;
+            BLUfxPresets[PRESET_USER].saturation = saturation;
+            BLUfxPresets[PRESET_USER].redScale = redScale;
+            BLUfxPresets[PRESET_USER].greenScale = greenScale;
+            BLUfxPresets[PRESET_USER].blueScale = blueScale;
+            BLUfxPresets[PRESET_USER].redOffset = redOffset;
+            BLUfxPresets[PRESET_USER].blueOffset = blueOffset;
+            BLUfxPresets[PRESET_USER].vignette = vignette;
+        }
     }
 }
 
@@ -835,7 +868,7 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
     {
         if (XPIsWidgetVisible(settingsWidget))
         {
-            SaveSettings();
+            //SaveSettings();   // now explicit save button and save in XPluginStop()
             XPHideWidget(settingsWidget);
         }
     }
@@ -925,6 +958,14 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
             raleighScale = DEFAULT_RALEIGH_SCALE;
             UpdateRaleighScale(1);
         }
+        else if (inParam1 == (long) loadButton)
+        {
+            LoadSettings();
+        }
+        else if (inParam1 == (long) saveButton)
+        {
+            SaveSettings();
+        }
         else
         {
             int i;
@@ -955,7 +996,7 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
 }
 
 // handles the menu-entries
-static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
+void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
 {
     // settings menu entry
     if ((long) inItemRef == 0)
@@ -982,6 +1023,11 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
             // add post-processing settings caption
             XPCreateWidget(x + 10, y - 30, x2 - 20, y - 45, 1, "Post-Processing Settings:", 0, settingsWidget, xpWidgetClass_Caption);
 
+            // add version attribution caption
+            XPCreateWidget(x2 - 25 - 70, y - 30, x2 - 10, y - 45, 1, "64-bit version", 0, settingsWidget, xpWidgetClass_Caption);
+            XPCreateWidget(x2 - 25 - 64, y - 45, x2 - 10, y - 45 - 15, 1, "August 2019", 0, settingsWidget, xpWidgetClass_Caption);
+            XPCreateWidget(x2 - 25 - 35, y - 60, x2 - 10, y - 60 - 15, 1, "by brat", 0, settingsWidget, xpWidgetClass_Caption);
+
             // add post-processing checkbox
             postProcessingCheckbox = XPCreateWidget(x + 20, y - 60, x2 - 20, y - 75, 1, "Enable Post-Processing", 0, settingsWidget, xpWidgetClass_Button);
             XPSetWidgetProperty(postProcessingCheckbox, xpProperty_ButtonType, xpRadioButton);
@@ -990,7 +1036,7 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
             // add brightness caption
             char stringBrightness[32];
             sprintf(stringBrightness, "Brightness: %.2f", brightness);
-            brightnessCaption = XPCreateWidget(x + 30, y - 90, x2 - 50, y - 105, 1, stringBrightness, 0, settingsWidget, xpWidgetClass_Caption);
+            brightnessCaption = XPCreateWidget(x + 30, y - 90 + 3, x2 - 50, y - 105 + 3, 1, stringBrightness, 0, settingsWidget, xpWidgetClass_Caption);
 
             // add brightness slider
             brightnessSlider = XPCreateWidget(x + 195, y - 90, x2 - 15, y - 105, 1, "Brightness", 0, settingsWidget, xpWidgetClass_ScrollBar);
@@ -1088,9 +1134,21 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
             XPSetWidgetProperty(vignetteSlider, xpProperty_ScrollBarMax, 100);
 
             // add reset button
-            presetButtons[PRESET_DEFAULT] = XPCreateWidget(x + 30, y - 300, x + 30 + 80, y - 315, 1, "Reset", 0, settingsWidget, xpWidgetClass_Button);
+            presetButtons[PRESET_DEFAULT] = XPCreateWidget(x + 30, y - 295, x + 30 + 80, y - 310, 1, "Reset", 0, settingsWidget, xpWidgetClass_Button);
             XPSetWidgetProperty(presetButtons[PRESET_DEFAULT], xpProperty_ButtonType, xpPushButton);
 
+            // add buttons for managing custom settings:
+            
+            // add custom preset reload, save, and restore buttons
+            presetButtons[PRESET_USER] = XPCreateWidget(x2 - 51 - 65, y - 295, x2 - 51, y - 310, 1, "Restore", 0, settingsWidget, xpWidgetClass_Button);
+            XPSetWidgetProperty(presetButtons[PRESET_DEFAULT], xpProperty_ButtonType, xpPushButton);
+            
+            saveButton = XPCreateWidget(x2 - 17 - 60, y - 334 + 15, x2 - 17, y - 334, 1, "Save .ini", 0, settingsWidget, xpWidgetClass_Button);
+            XPSetWidgetProperty(saveButton, xpProperty_ButtonType, xpPushButton);
+            
+            loadButton = XPCreateWidget(x2 - 86 - 63, y - 334 + 15, x2 - 86, y - 334, 1, "Load .ini", 0, settingsWidget, xpWidgetClass_Button);
+            XPSetWidgetProperty(saveButton, xpProperty_ButtonType, xpPushButton);
+            
             // add post-processing presets caption
             XPCreateWidget(x + 10, y - 330, x2 - 20, y - 345, 1, "Post-Processing Presets:", 0, settingsWidget, xpWidgetClass_Caption);
 
@@ -1291,6 +1349,18 @@ static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, in
     return 0;
 }
 
+int toggleSettingsHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase == xplm_CommandBegin) {
+        if (settingsWidget && XPIsWidgetVisible(settingsWidget))
+            XPHideWidget(settingsWidget);       // toggle display off
+        else
+            MenuHandlerCallback(NULL, NULL);    // dispatch command via legacy menu handler
+    }
+
+    return 1;   // allow others to listen to this command if they like
+}
+
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 {
     // set plugin info
@@ -1309,10 +1379,19 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // register own dataref
     overrideControlCinemaVeriteDataRef = XPLMRegisterDataAccessor(NAME_LOWERCASE "/override_control_cinema_verite", xplmType_Int,  1, GetOverrideControlCinemaVeriteDataRefCallback, SetOverrideControlCinemaVeriteDataRefCallback,  NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
+    // register our own commandref
+    XPLMCommandRef toggleSettingsCmd = XPLMCreateCommand(NAME_LOWERCASE "/toggle_settings", "toggle " NAME " settings window open/closed");
+    XPLMRegisterCommandHandler(toggleSettingsCmd, toggleSettingsHandler, 1, NULL);
+    
     // create menu-entries
     int subMenuItem = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 1);
     XPLMMenuID menu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
-    XPLMAppendMenuItem(menu, "Settings", (void*) 0, 1);
+    
+    // before adding modern menu option, check to be sure XPLM 301 is available:
+    if (XPLMFindSymbol("XPLMAppendMenuItemWithCommand"))
+        XPLMAppendMenuItemWithCommand(menu, "Settings", toggleSettingsCmd);
+    else
+        XPLMAppendMenuItem(menu,"Settings", NULL, 1);
 
     // read and apply config file
     LoadSettings();
@@ -1352,6 +1431,9 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
 PLUGIN_API void XPluginStop(void)
 {
+    // save settings on exit to auto-restore on next startup
+    SaveSettings();
+    
     CleanupShader(1);
 
     // unregister own DataRef

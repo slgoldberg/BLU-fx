@@ -10,3 +10,5 @@ ipch
 *.sln
 *.sln.docstates
 .vs
+DerivedData
+.??*.swp
