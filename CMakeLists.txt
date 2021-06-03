@@ -21,23 +21,22 @@ include_directories("${CMAKE_SOURCE_DIR}/SDK/CHeaders/Widgets")
 include_directories("${CMAKE_SOURCE_DIR}/GLee5_4")
 include_directories("${CMAKE_SOURCE_DIR}/.")
 
-#Don't think we need this (this was from FWL verison)
-#if (WIN32)
+if (WIN32)
+#TODO: find and install glut for Windows here or else update this:
 #    include_directories("${CMAKE_SOURCE_DIR}/GLUT_for_Windows")
-#endif (WIN32)
+endif (WIN32)
 
 # Specify library search locations.
 if (WIN32)
     #list(APPEND CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/include64")
-    #list(APPEND CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/GLUT_for_Windows")
-    list(APPEND CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/SDK/Libraries/Win")
+#    list(APPEND CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/GLUT_for_Windows")
+#    list(APPEND CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/SDK/Libraries/Win")
 elseif (APPLE)
     list(APPEND CMAKE_FRAMEWORK_PATH "${CMAKE_SOURCE_DIR}/SDK/Libraries/Mac")
     #list(APPEND CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/mac_libs")
 elseif (UNIX)
-    #list(APPEND CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/linux_libs/OpenAL")
+    # any other dependencies here
 endif ()
-
 
 # Enable all X-Plane SDK APIs up to the newest version.
 add_definitions(-DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1)
@@ -54,10 +53,17 @@ add_compile_options(-fexceptions)
 # option is simply ignored, since symbol visibility works differently there.
 add_compile_options(-fvisibility=hidden)
 
+if (WIN32)
+    add_compile_options(-fpermissive)
+endif ()
+
 # Enable stricter warnings and then disable some we are not interested in.
-add_compile_options(-w)
-#add_compile_options(-W)
+#TEMPORARILY COMMENTED OUT; see below:
+#add_compile_options(-Wall -Wpedantic -Wshadow -Wfloat-equal -Wextra)
 #add_compile_options(-Wno-unused)
+#
+# Instead, brat sez just get rid of all those stupid warnings for now:
+add_compile_options(-w)
 
 # Always use position-independent code and highest optimization level (FPS!).
 add_compile_options(-O3 -fPIC)
@@ -79,28 +85,25 @@ if (APPLE)
     target_link_libraries(blu_fx -mmacosx-version-min=10.10)
 endif ()
 
-# Link OpenGL and OpenAL related libraries.
+# Link OpenGL and related libraries.
+if (UNIX)
 find_package(OpenGL REQUIRED)  # apt install freeglut3-dev
-#find_library(OPENAL_LIBRARY NAMES openal OpenAL OpenAL32)  # apt install libopenal-dev
 find_library(GLUT_LIBRARY NAMES glut GLUT glut64)  # apt install freeglut3-dev
-target_link_libraries(blu_fx ${OPENGL_LIBRARIES} ${OPENAL_LIBRARY} ${GLUT_LIBRARY})
-
-# Add GLee5_4 library for custom shader loading
-#TODO -- FIXME -- we need to deal with this somehow.. maybe just compile ourselves?:
-#add_subdirectory(GLee5_4)
-#target_link_libraries(blu_fx GLee5_4::GLee5_4)
+target_link_libraries(blu_fx ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
+elseif (WIN32)
+    find_package(OpenGL REQUIRED)
+    target_link_libraries(blu_fx ${OPENGL_LIBRARIES})
+endif ()
 
 # Link X-Plane plugin system libraries. They are only provided for OS X and Windows.
-if (WIN32 OR APPLE)
+if (WIN32)
+    target_link_libraries(blu_fx ${CMAKE_SOURCE_DIR}/SDK/Libraries/Win/XPLM_64.lib)
+    target_link_libraries(blu_fx ${CMAKE_SOURCE_DIR}/SDK/Libraries/Win/XPWidgets_64.lib)
+    target_link_libraries(blu_fx winmm.lib)
+elseif (APPLE)
     find_library(XPLM_LIBRARY NAMES XPLM XPLM_64.lib)
     find_library(XPWIDGETS_LIBRARY NAMES XPWidgets XPWidgets_64.lib)
     target_link_libraries(blu_fx ${XPLM_LIBRARY} ${XPWIDGETS_LIBRARY})
-endif ()
-
-# Link OS-specific libraries HidApi depends on. Only supported for Windows and Linux.
-if ((WIN32 OR UNIX) AND NOT APPLE)
-    find_library(HIDAPIDEPS_LIBRARY NAMES setupapi udev)
-    target_link_libraries(blu_fx ${HIDAPIDEPS_LIBRARY})
 endif ()
 
 # Link library for dynamic loading of shared objects on UNIX systems.
@@ -112,9 +115,14 @@ endif ()
 # Link OS X core system libraries.
 if (APPLE)
     find_library(CORE_FOUNDATION_LIBRARY CoreFoundation)
-    find_library(IOKIT_LIBRARY IOKit)
-    target_link_libraries(blu_fx ${IOKIT_LIBRARY} ${CORE_FOUNDATION_LIBRARY})
+    target_link_libraries(blu_fx ${CORE_FOUNDATION_LIBRARY})
 endif ()
+
+# If we need IOKit, but I don't think we do:
+#if (APPLE)
+#    find_library(IOKIT_LIBRARY IOKit)
+#    target_link_libraries(blu_fx ${IOKIT_LIBRARY})
+#endif ()
 
 if (WIN32)
     # Unlike OS X and Linux we build standard libraries statically since X-Plane does not provide them.

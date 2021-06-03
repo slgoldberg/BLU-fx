@@ -38,6 +38,7 @@
 #include <OpenGL/gl.h>
 #elif IBM
 #include "GLee.h"
+#pragma comment( lib, "winmm.lib")   
 #elif LIN
 #include <GL/gl.h>
 #endif
