@@ -3,6 +3,9 @@
 xcuserdata
 *.xcworkspace
 build
+build-lin
+build-win
+build-mac
 Release
 ipch
 *.suo
@@ -10,5 +13,6 @@ ipch
 *.sln
 *.sln.docstates
 .vs
+.vscode
 DerivedData
 .??*.swp

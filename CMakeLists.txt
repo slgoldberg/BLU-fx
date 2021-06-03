@@ -106,23 +106,18 @@ elseif (APPLE)
     target_link_libraries(blu_fx ${XPLM_LIBRARY} ${XPWIDGETS_LIBRARY})
 endif ()
 
+#TODO: I think these are not needed (I copied them from another makelists):
 # Link library for dynamic loading of shared objects on UNIX systems.
-if (UNIX)
-    find_library(DL_LIBRARY dl)
-    target_link_libraries(blu_fx ${DL_LIBRARY})
-endif ()
+#if (UNIX)
+#    find_library(DL_LIBRARY dl)
+#    target_link_libraries(blu_fx ${DL_LIBRARY})
+#endif ()
 
 # Link OS X core system libraries.
 if (APPLE)
     find_library(CORE_FOUNDATION_LIBRARY CoreFoundation)
     target_link_libraries(blu_fx ${CORE_FOUNDATION_LIBRARY})
 endif ()
-
-# If we need IOKit, but I don't think we do:
-#if (APPLE)
-#    find_library(IOKIT_LIBRARY IOKit)
-#    target_link_libraries(blu_fx ${IOKIT_LIBRARY})
-#endif ()
 
 if (WIN32)
     # Unlike OS X and Linux we build standard libraries statically since X-Plane does not provide them.
@@ -131,13 +126,12 @@ if (WIN32)
     # entire plugin. This allows building the plugin nativaly on Windows.
     target_link_libraries(blu_fx -static)
 elseif (APPLE)
-    # Restrict set of symbols exported from the plugin. This reduces changes of
-    # conflict with other plugins, in particular ones with Lua interpreter
-    # embedded.
+    # Restrict set of symbols exported from the plugin:
     target_link_libraries(blu_fx "-exported_symbols_list ${CMAKE_SOURCE_DIR}/blu_fx.sym_mac")
 elseif (UNIX)
     # Specify additional runtime search laths for dynamically-linked libraries.
-    target_link_libraries(blu_fx -Wl,-rpath=./Resources/plugins/blu_fx/64)
+#TODO: maybe remove this; currently it's commented out:
+#   target_link_libraries(blu_fx -Wl,-rpath=./Resources/plugins/blu_fx/64)
     # Restrict set of symbols exported from the plugin. This reduces changes of
     # conflict with other plugins, in particular ones with Lua interpreter
     # embedded.

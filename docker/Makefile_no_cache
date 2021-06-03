@@ -10,9 +10,9 @@ all: mac win lin
 	docker inspect -f "{{ .ID}}" $(container):latest > .image
 
 bash: .image
-	docker run -it --rm -v "$(realpath ../src):/src" --entrypoint bash $(container):latest
+	docker run -it --rm -v "$(realpath ../):/src" --entrypoint bash $(container):latest
 
 $(platforms): .image
-	docker run -i --rm -v "$(realpath ../src):/src" $(container):latest --complete $(COMPLETE_EDITION) $@
+	docker run -i --rm -v "$(realpath ../):/src" $(container):latest $@
 
 .PHONY: $(platforms) bash
