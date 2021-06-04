@@ -1,6 +1,6 @@
 FROM ubuntu:16.04
 
-RUN sed -i -e 's/http:\/\/archive.ubuntu.com\/ubuntu\//mirror:\/\/mirrors.ubuntu.com\/mirrors.txt/' /etc/apt/sources.list && apt-get update
+RUN sed -i -e 's/http:\/\/archive.ubuntu.com\/ubuntu\//mirror:\/\/mirrors.ubuntu.com\/mirrors.txt/' /etc/apt/sources.list && apt-get update --fix-missing
 
 # Install Linux toolchain (GCC).
 RUN apt-get install -y --no-install-recommends build-essential ninja-build sudo bash coreutils ca-certificates curl \
