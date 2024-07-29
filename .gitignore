@@ -3,10 +3,9 @@
 xcuserdata
 *.xcworkspace
 build
-build-lin
-build-win
-build-mac
+build-*
 Release
+SDK_prev
 ipch
 *.suo
 *.user

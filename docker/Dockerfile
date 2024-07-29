@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM --platform=linux/amd64 ubuntu:16.04
 
 RUN sed -i -e 's/http:\/\/archive.ubuntu.com\/ubuntu\//mirror:\/\/mirrors.ubuntu.com\/mirrors.txt/' /etc/apt/sources.list && apt-get update --fix-missing
 

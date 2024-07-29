@@ -79,10 +79,16 @@ add_library(blu_fx SHARED ${BLUFX_SRCS})
 target_compile_features(blu_fx PUBLIC cxx_std_11)
 
 if (APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING
+        "Minimum macOS version" FORCE)
+    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64"
+        CACHE STRING "Build architectures for mac OS X" FORCE)
     # X-Plane supports OS X 10.10+, so this should ensure blu_fx can run on
     # all supported versions.
-    target_compile_options(blu_fx PUBLIC -mmacosx-version-min=10.10)
-    target_link_libraries(blu_fx -mmacosx-version-min=10.10)
+    target_compile_options(blu_fx PUBLIC
+                           -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+    target_link_libraries(blu_fx
+                          -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
 endif ()
 
 # Link OpenGL and related libraries.
@@ -139,12 +145,33 @@ elseif (UNIX)
 endif ()
 
 
-set_target_properties(blu_fx PROPERTIES PREFIX "")
+# set_target_properties(blu_fx PROPERTIES PREFIX "")
+# if (WIN32)
+#     set_target_properties(blu_fx PROPERTIES OUTPUT_NAME "win")
+# elseif (APPLE)
+#     set_target_properties(blu_fx PROPERTIES OUTPUT_NAME "mac")
+# elseif (UNIX)
+#     set_target_properties(blu_fx PROPERTIES OUTPUT_NAME "lin")
+# endif ()
+# set_target_properties(blu_fx PROPERTIES SUFFIX ".xpl")
+
+set_target_properties(blu_fx
+    PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "blu_fx"
+    SUFFIX ".xpl"
+)
+
+# Install target based on platform
 if (WIN32)
-    set_target_properties(blu_fx PROPERTIES OUTPUT_NAME "win")
+    install(TARGETS blu_fx DESTINATION
+            "/Users/brat/xp11/Resources/plugins/blu_fx/win_x64")
 elseif (APPLE)
-    set_target_properties(blu_fx PROPERTIES OUTPUT_NAME "mac")
+    install(TARGETS blu_fx DESTINATION
+            "/Users/brat/xp11/Resources/plugins/blu_fx/mac_x64")
+    install(TARGETS blu_fx DESTINATION
+            "/Users/brat/xp12/Resources/plugins/blu_fx/mac_x64")
 elseif (UNIX)
-    set_target_properties(blu_fx PROPERTIES OUTPUT_NAME "lin")
+    install(TARGETS blu_fx DESTINATION
+            "/Users/brat/xp11/Resources/plugins/blu_fx/lin_x64")
 endif ()
-set_target_properties(blu_fx PROPERTIES SUFFIX ".xpl")

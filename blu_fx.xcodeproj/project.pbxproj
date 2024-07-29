@@ -7,7 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA15C19F22F2AB5900F8C3E8 /* mac.xpl in CopyFiles */ = {isa = PBXBuildFile; fileRef = D607B19909A556E400699BC3 /* mac.xpl */; };
+		AA15C19F22F2AB5900F8C3E8 /* blu_fx.xpl in CopyFiles */ = {isa = PBXBuildFile; fileRef = D607B19909A556E400699BC3 /* blu_fx.xpl */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AA2B19432C2E1BBA00AEEBA9 /* blu_fx.xpl in CopyFiles */ = {isa = PBXBuildFile; fileRef = D607B19909A556E400699BC3 /* blu_fx.xpl */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		D67297EB0F9E0FCC00CFD1FA /* blu_fx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D67297EA0F9E0FCC00CFD1FA /* blu_fx.cpp */; };
 		D6A7BDAA16A1DEA200D1426A /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6A7BDA916A1DEA200D1426A /* OpenGL.framework */; };
 		D6A7BDC116A1DEC000D1426A /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6A7BDC016A1DEC000D1426A /* CoreFoundation.framework */; };
@@ -19,17 +20,27 @@
 		AA15C19E22F2AB2B00F8C3E8 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "$(XPLANE_INSTALL_DIR)/Resources/plugins/$(PROJECT_NAME)/64";
+			dstPath = "$(XPLANE_INSTALL_DIR)/Resources/plugins/$(PROJECT_NAME)/mac_x64";
 			dstSubfolderSpec = 0;
 			files = (
-				AA15C19F22F2AB5900F8C3E8 /* mac.xpl in CopyFiles */,
+				AA15C19F22F2AB5900F8C3E8 /* blu_fx.xpl in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA2B19422C2E1B7200AEEBA9 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(XPLANE12_INSTALL_DIR)/Resources/plugins/$(PROJECT_NAME)/mac_x64";
+			dstSubfolderSpec = 0;
+			files = (
+				AA2B19432C2E1BBA00AEEBA9 /* blu_fx.xpl in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		D607B19909A556E400699BC3 /* mac.xpl */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = mac.xpl; sourceTree = BUILT_PRODUCTS_DIR; };
+		D607B19909A556E400699BC3 /* blu_fx.xpl */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = blu_fx.xpl; sourceTree = BUILT_PRODUCTS_DIR; };
 		D67297EA0F9E0FCC00CFD1FA /* blu_fx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = blu_fx.cpp; sourceTree = "<group>"; };
 		D6A7BDA916A1DEA200D1426A /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
 		D6A7BDC016A1DEC000D1426A /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
@@ -72,7 +83,7 @@
 		D607B19A09A556E400699BC3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D607B19909A556E400699BC3 /* mac.xpl */,
+				D607B19909A556E400699BC3 /* blu_fx.xpl */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -98,6 +109,7 @@
 				D607B19609A556E400699BC3 /* Sources */,
 				D607B19709A556E400699BC3 /* Frameworks */,
 				AA15C19E22F2AB2B00F8C3E8 /* CopyFiles */,
+				AA2B19422C2E1B7200AEEBA9 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -105,7 +117,7 @@
 			);
 			name = blu_fx;
 			productName = StarterPlugin;
-			productReference = D607B19909A556E400699BC3 /* mac.xpl */;
+			productReference = D607B19909A556E400699BC3 /* blu_fx.xpl */;
 			productType = "com.apple.product-type.library.dynamic";
 		};
 /* End PBXNativeTarget section */
@@ -118,13 +130,14 @@
 			};
 			buildConfigurationList = D607B16209A5563100699BC3 /* Build configuration list for PBXProject "blu_fx" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = English;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				English,
-				Japanese,
-				French,
-				German,
+				de,
+				ja,
+				Base,
+				en,
+				fr,
 			);
 			mainGroup = D607B15F09A5563000699BC3;
 			productRefGroup = D607B19A09A556E400699BC3 /* Products */;
@@ -173,8 +186,9 @@
 					"$(XPSDK_ROOT)/CHeaders/XPLM",
 					"$(HEADER_SEARCH_PATHS)",
 				);
+				INSTALL_PATH = blu_fx/mac_x64;
 				MACH_O_TYPE = mh_bundle;
-				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-stdlib=libc++",
@@ -183,7 +197,8 @@
 				PRODUCT_NAME = "${TARGET_NAME}";
 				SDKROOT = macosx;
 				USE_HEADERMAP = NO;
-				XPLANE_INSTALL_DIR = "/Users/brat/Desktop/X-Plane 11";
+				XPLANE12_INSTALL_DIR = /Users/brat/xp12;
+				XPLANE_INSTALL_DIR = /Users/brat/xp11;
 				XPSDK_ROOT = SDK;
 			};
 			name = Debug;
@@ -213,8 +228,9 @@
 					"$(XPSDK_ROOT)/CHeaders/XPLM",
 					"$(HEADER_SEARCH_PATHS)",
 				);
+				INSTALL_PATH = blu_fx/mac_x64;
 				MACH_O_TYPE = mh_bundle;
-				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-stdlib=libc++",
@@ -223,7 +239,8 @@
 				PRODUCT_NAME = "${TARGET_NAME}";
 				SDKROOT = macosx;
 				USE_HEADERMAP = NO;
-				XPLANE_INSTALL_DIR = "/Users/brat/Desktop/X-Plane 11";
+				XPLANE12_INSTALL_DIR = /Users/brat/xp12;
+				XPLANE_INSTALL_DIR = /Users/brat/xp11;
 				XPSDK_ROOT = SDK;
 			};
 			name = Release;
@@ -231,14 +248,22 @@
 		D607B19C09A556E400699BC3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_NAME = mac;
+				COPY_PHASE_STRIP = NO;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				PRODUCT_NAME = blu_fx;
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = debugging;
 			};
 			name = Debug;
 		};
 		D607B19D09A556E400699BC3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_NAME = mac;
+				COPY_PHASE_STRIP = NO;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				PRODUCT_NAME = blu_fx;
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = debugging;
 			};
 			name = Release;
 		};
