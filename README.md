@@ -4,13 +4,31 @@
 GNU General Public License v2.0
 
 #### Fork status, contributing changes, etc.:
-This is a fork from the last known state of the original repository, <github.com/bwRavencl/BLU-fx>.
+This is the new home of BLU-FX, a plugin for X-Plane that provides a very simple way for users
+(on Mac, Windows, and Linux!) to customize a set of basic graphics filters, such as brightness,
+contrast, color balance, and more.
 
-The author of this fork is Steven L. Goldberg, who attempted to contribute these changes back
-to the core project, however the Pull Request was denied due to the author claiming to have
-abandoned the effort.  So, others are welcome to pick up from here and run with it if desired.
+While this repository is shown as a fork of the original repository <github.com/bwRavencl/BLU-fx>.
+The owner of that repository has given full support to the continuation of this project from this
+repository going forward. (Again, the original repository is now just an archive.)
+
+The owner of this new fork is Steven L. Goldberg, aka "brat", aka "slgoldberg" here and on the
+X-Plane "dot org" forums.
 
 Therefore, please fork *this* repository instead of the original, and send PRs to `slgoldberg`.
+(Note: before forking this version, please contact the owner, since the next set of changes
+will be quite large, including a complete rewrite of the user interface using ImGui and ImgWindow,
+which will change about 80% of the code as of this writing, and which will obviate many of the
+known issues (bugs) with the current slider behavior, most of which are simply artifacts of a
+very old X-Plane library that is barely able to keep up with modern X-Plane UI.
+
+Note that this fork ONLY supports versions of X-Plane starting with v11.10, going through the
+latest known versions (as of this writing, X-Plane v12).  Also, the build instructions below
+are not quite up to date, as most things are now done in Docker, except the Mac build is
+currently only tested using the direct xCode build method from a macOS machine. (The build
+can be run either on an Apple Silicon or on an Intel-based Mac -- and either will produce
+a universal binary that contains support for both target platforms in a single .xpl file.
+For this to work, the only versions of macOS that are supported are 10.11 and later.)
 
 Thanks!
 
