@@ -1,4 +1,7 @@
-/* Copyright (C) 2018  Matteo Hausner
+/* Copyright (C) 2024  Steve Goldberg
+ *
+ * Original version:
+ * Copyright (C) 2018  Matteo Hausner
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,18 +57,25 @@
 
 // define version
 // v1.0 = original release forked by @slgoldberg from github repo
-// v1.1 = 64-bit release by @slgoldberg (with Pull Request *denied* by author
-//        who has abandoned the original repository; changes included fixing
-//        build for "modern" environment (plugin is now 64-bit only), as well
-//        as UI improvements including "revert" button so that changes don't
-//        automatically get saved to .ini file at quit if user doesn't want to
-//        keep it.
-// v1.2 = updated release by @slgoldberg to support XP12, arm64/x86 universal
-//        build for macOS with both Apple Silicon and Intel, updated CMake
-//        configuration to deploy to X-Plane 11.10+ plugin format (though
-//        for now, this ignores older platforms since I don't think it would
-//        work there anyway), including updating the widget implementation to
-//        sit on "modern" XPLM31 windows that obey "UI zoom" scaling, etc.
+// v1.1 = 64-bit "release" by @slgoldberg (to support X-Plane 11 *only*, i.e.
+//        without support for 32-bit, and using the modern plugin format that
+//        is only supported in X-Plane versions 11.10 and later. This build
+//        also has some UI improvements, such as a "revert" button so that
+//        changes made after the last load of the .ini file can be discarded
+//        (because, otherwise, the user might inadvertently overwrite their
+//        actual .ini file with something they were just playing with).
+//        NOTE: while this is a "release", it was never released to any users.
+//        It was only used for personal use by Steve Goldberg until v1.2 which
+//        has the intention of being released more broadly.
+// v1.2 = updated by @slgoldberg to support XP12 and arm64/x86 universal builds
+//        for macOS (i.e., with both Apple Silicon and Intel procsesors), to
+//        update the CMake configuration to build via CMake on Docker and
+//        to make the plugin use the new universal plugin standard (XP11.10+).
+//        Other changes include fixing the UI to work better on "modern" XP
+//        screen configurations (such as supporting UI Zoom!), including some
+//        formatting changes to make it fit better in all cases, and many more
+//        small improvements in the Settings UI in preparation for a more
+//        radical UI refresh to use ImGui (in the next planned release).
 #define VERSION "1.2"
 #define VERSION_BLANK "   "           /* to align multi-line log entries :-) */
 
