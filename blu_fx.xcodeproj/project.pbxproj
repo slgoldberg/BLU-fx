@@ -40,6 +40,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AA6378EF2C5C5B7500D865B0 /* tools */ = {isa = PBXFileReference; lastKnownFileType = folder; path = tools; sourceTree = "<group>"; };
 		D607B19909A556E400699BC3 /* blu_fx.xpl */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = blu_fx.xpl; sourceTree = BUILT_PRODUCTS_DIR; };
 		D67297EA0F9E0FCC00CFD1FA /* blu_fx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = blu_fx.cpp; sourceTree = "<group>"; };
 		D6A7BDA916A1DEA200D1426A /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
@@ -74,6 +75,7 @@
 		D607B15F09A5563000699BC3 = {
 			isa = PBXGroup;
 			children = (
+				AA6378EF2C5C5B7500D865B0 /* tools */,
 				D6A7BDAD16A1DEA700D1426A /* Frameworks */,
 				AC4E46B809C2E0B3006B7E1B /* Source */,
 				D607B19A09A556E400699BC3 /* Products */,
