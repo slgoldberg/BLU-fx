@@ -57,7 +57,7 @@ die() {
 #     developer_id=
 #         This should be the name of your app distribution certifiate, e.g.,
 #         'developer_id="Developer ID Application: Acme Co"'.
-developer_id="Developer ID Application: Steven Goldberg (WDZFKR6BW2)"
+developer_id="<replace_me>"
 #
 #     app_password=
 #         This should be the name of the login keychain password item that
@@ -67,17 +67,17 @@ developer_id="Developer ID Application: Steven Goldberg (WDZFKR6BW2)"
 #app_password=@keychain:AC_PASSWORD           # note: this doesn't work for me
 # Instead, I use the actual string app password in the clear for now:
 # (Note: of course this won't work for any other uses than specifically mine.)
-app_password=nkgk-sugc-kgfs-sles        # note: this MUST be changed to yours!
+app_password=<replace_me>        # note: this MUST be changed to yours!
 #
 #     username=
 #         This is your Apple ID you log in with, e.g. it might be your email
 #         address or maybe it's allowed to be a phone number (I'm not positive):
-username=brat@footbag.org
+username=<replace_me>
 #
 #     team_id=
 # This is your team ID per Apple developer site needed for notarytool (and this
 # also confuses me and I'm not sure it's needed anymore as of the newer SDK):
-team_id=WDZFKR6BW2
+team_id=<replace_me>
 #
 # END CONFIGURATION. (Set each parameter above before you try this script.)
 # ----------------------------------------------------------------------------
