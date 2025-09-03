@@ -81,7 +81,7 @@
 
 // define qualified name that include version (e.g., "BLU-fx v1.2")
 #define NAME_VERSION NAME" v" VERSION
-#define NAME_VERSION_BLANK NAME_BLANK"  " VERSION_BLANK "  "
+#define NAME_VERSION_BLANK NAME"  " VERSION_BLANK "  "
 
 // define config file path
 #if IBM
@@ -739,6 +739,7 @@ static float ControlCinemaVeriteCallback(float inElapsedSinceLastCall, float inE
 {
     // Don't assume this callback should be called, since it could change before the callback is unregistered when the user opts out,
     // and of course also ignore it if the override flag dataref is set:
+	// TODO: UPDATE THIS TO WORK CORRECTLY IN XP12+ (i.e., use "split datarefs" in XPLM4 world for interior vs. exterior cinema verite equivalents)
     if (controlCinemaVeriteEnabled && !overrideControlCinemaVerite)
     {
         if (XPLMGetDatai(viewTypeDataRef) == 1026) // 3D Cockpit
@@ -1707,8 +1708,8 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMDebugString(NAME_VERSION ": Special notice for macOS users:\n");
     XPLMDebugString(NAME_VERSION_BLANK "This is a notarized \"universal\" binary, for macOS on both Intel\n");
     XPLMDebugString(NAME_VERSION_BLANK "and Apple Silicon, built by Steve Goldberg (PM @slgoldberg on\n");
-    XPLMDebugString(NAME_VERSION_BLANK "X-Plane.org forums). " NAME " v1.0 was created by Matteo Hausner,");
-    XPLMDebugString(NAME_VERSION_BLANK "with all future updates from v1.1 onward (including this release)");
+    XPLMDebugString(NAME_VERSION_BLANK "X-Plane.org forums). " NAME " v1.0 was created by Matteo Hausner,\n");
+    XPLMDebugString(NAME_VERSION_BLANK "with all future updates from v1.1 onward (including this release)\n");
     XPLMDebugString(NAME_VERSION_BLANK "by Steve Goldberg. From both of us: you're welcome!\n");
 #else   /* Show this general multi-line "about" message for Linux and Windows builds: */
     XPLMDebugString(NAME_VERSION ": About this release (" NAME_LOWERCASE ".xpl version " VERSION "):\n");
@@ -1716,7 +1717,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMDebugString(NAME_VERSION_BLANK "universal plugin binary format, and includes feature improvements,\n");
     XPLMDebugString(NAME_VERSION_BLANK "all of which were added by Steve Goldberg (PM @slgoldberg on the\n");
     XPLMDebugString(NAME_VERSION_BLANK "X-Plane.org forums), with the original plugin created by Matteo\n");
-    XPLMDebugString(NAME_VERSION_BLANK "Hausner). From both of us: you're welcome!\n");
+    XPLMDebugString(NAME_VERSION_BLANK "Hausner). From both of us: you're welcome!");
 #endif
     
     // prepare fragment-shader
@@ -1725,7 +1726,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // obtain datarefs
     cinemaVeriteDataRef = XPLMFindDataRef("sim/graphics/view/cinema_verite");
     viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
-    ignitionKeyDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/ignition_key");
+//    ignitionKeyDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/ignition_key");	// no longer used
 
     // register own dataref
     overrideControlCinemaVeriteDataRef = XPLMRegisterDataAccessor(NAME_LOWERCASE "/override_control_cinema_verite", xplmType_Int,  1, GetOverrideControlCinemaVeriteDataRefCallback, SetOverrideControlCinemaVeriteDataRefCallback,  NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);

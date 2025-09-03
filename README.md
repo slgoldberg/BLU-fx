@@ -123,7 +123,9 @@ reduce the total size which is currently exhorbitant (see above) and has not bee
 
 ## Preparing a release:
 
-There is no script available yet to build a full release. However, the steps to building a release are below.  Assuming you are able to build natively on a "modern" macOS machine (i.e., running macOS  10.13 or later), and you can run VSCode, CMake, and Docker on the same machine:
+**TODO**: This section was written before we added support for `Skunkcrafts Updater Standalone`, which requires the builder to set things up to work correctly with it, including creating folders and mounting filesystems remotely. For now, only the original author can do a release through that method, but it will be documented here in a future commit...
+
+Also, there is no script available yet to build a full release (with or without Skunkcrafts). However, the steps to building a release are below.  Assuming you are able to build natively on a "modern" macOS machine (i.e., running macOS  10.13 or later), and you can run VSCode, CMake, and Docker on the same machine:
 
 1. Open the VSCode project for your local blu_fx source tree (wherever it is).  For example, for the first time, maybe you cloned this project or forked your own version and want to build to start out:
    ```
