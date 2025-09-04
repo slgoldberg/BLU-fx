@@ -76,7 +76,7 @@
 //        formatting changes to make it fit better in all cases, and many more
 //        small improvements in the Settings UI in preparation for a more
 //        radical UI refresh to use ImGui (in the next planned release).
-#define VERSION "1.2"
+#define VERSION "1.2.1"
 #define VERSION_BLANK "   "           /* to align multi-line log entries :-) */
 
 // define qualified name that include version (e.g., "BLU-fx v1.2")
@@ -506,21 +506,40 @@ BLUfxPreset BLUfxPresets [PRESET_MAX] =
                             "gl_FragColor = vec4(color, 1.0);"\
                         "}"
 
+// macros for version number relation functionality (i.e., "legacy" or not)
+static int xplmVersionNum = 0;							// filled in at startup
+#define IS_XP12         (xplmVersionNum >= 120000)
+#define LEGACY_FEATURES (!IS_XP12)
+
 // global settings variables
 static int postProcesssingEnabled = DEFAULT_POST_PROCESSING_ENABLED, fpsLimiterEnabled = DEFAULT_FPS_LIMITER_ENABLED, controlCinemaVeriteEnabled = DEFAULT_CONTROL_CINEMA_VERITE_ENABLED;
 static float maxFps = DEFAULT_MAX_FRAME_RATE, disableCinemaVeriteTime = DEFAULT_DISABLE_CINEMA_VERITE_TIME;
 static float brightness = BLUfxPresets[PRESET_DEFAULT].brightness, contrast = BLUfxPresets[PRESET_DEFAULT].contrast, saturation = BLUfxPresets[PRESET_DEFAULT].saturation, redScale = BLUfxPresets[PRESET_DEFAULT].redScale, greenScale = BLUfxPresets[PRESET_DEFAULT].greenScale, blueScale = BLUfxPresets[PRESET_DEFAULT].blueScale, redOffset = BLUfxPresets[PRESET_DEFAULT].redOffset, greenOffset = BLUfxPresets[PRESET_DEFAULT].greenOffset, blueOffset = BLUfxPresets[PRESET_DEFAULT].blueOffset, vignette = BLUfxPresets[PRESET_DEFAULT].vignette, raleighScale = DEFAULT_RALEIGH_SCALE;
+
+// static function to determine whether a given BLUfxPreset matches the current settings globals:
+bool isActivePreset (BLUfxPreset_t *preset)
+{
+	return (!preset ? false :
+					  preset->brightness == brightness &&
+					  preset->saturation == saturation &&
+					  preset->blueOffset == blueOffset &&
+					  preset->blueScale == blueScale &&
+					  preset->contrast == contrast &&
+//					  preset->disableCinemaVeriteTime == disableCinemaVeriteTime &&
+					  preset->greenOffset == greenOffset &&
+					  preset->greenScale == greenScale &&
+//					  preset->maxFps == maxFps &&
+					  (IS_XP12 || preset->raleighScale == raleighScale) &&
+					  preset->redOffset == redOffset &&
+					  preset->redScale == redScale &&
+					  preset->vignette == vignette);
+};
 
 // global internal variables
 static int lastResolutionX = 0, lastResolutionY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVerite = 0;
 static GLuint textureId = 0, program = 0, fragmentShader = 0;
 static float startTimeFlight = 0.0f, endTimeFlight = 0.0f, startTimeDraw = 0.0f, endTimeDraw = 0.0f, lastMouseUsageTime = 0.0f;
 static XPLMWindowID fakeWindow = NULL;
-static int xplmVersionNum = 0;
-
-// macros for version number relation functionality (i.e., "legacy" or not)
-#define IS_XP12         (xplmVersionNum >= 120000)
-#define LEGACY_FEATURES (!IS_XP12)
 
 // global dataref variables
 static XPLMDataRef cinemaVeriteDataRef = NULL, viewTypeDataRef = NULL, raleighScaleDataRef = NULL, overrideControlCinemaVeriteDataRef = NULL, ignitionKeyDataRef = NULL;
@@ -920,6 +939,16 @@ static void UpdateSettingsWidgets(void)
     XPSetWidgetProperty(raleighScaleSlider, xpProperty_ScrollBarSliderPosition, (intptr_t) raleighScale);
     XPSetWidgetProperty(maxFpsSlider, xpProperty_ScrollBarSliderPosition, (intptr_t) (maxFps));
     XPSetWidgetProperty(disableCinemaVeriteTimeSlider, xpProperty_ScrollBarSliderPosition, (intptr_t) (disableCinemaVeriteTime));
+	
+	// Disable the currently-selected preset, if any, including the "reset" button for the default preset,
+	// and the "restore" or "load .ini" buttons for the current "user" preset:
+	// (Note: we'd prefer to highlight the button, but I can't figure that out.)
+	int i;
+	for (int i = 0; i < PRESET_MAX; i++) {
+		bool isActive = isActivePreset(&BLUfxPresets[i]);
+		XPSetWidgetProperty(presetButtons[i], xpProperty_Enabled, (isActive ? 0 : 1));	// disable only the ACTIVE preset
+		XPSetWidgetProperty(presetButtons[i], xpProperty_Hilited, (isActive ? 1 : 0));	// this seems like it only works in ONE case out of all of them...  TODO
+	}
 }
 
 // saves current settings to the config file
@@ -1690,7 +1719,11 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // set plugin info
     strcpy(outName, NAME_VERSION);
     strcpy(outSig, "de.bwravencl." NAME_LOWERCASE); // TODO: new signature?
-    strcpy(outDesc, NAME_VERSION " enhances your X-Plane experience!");
+#if _DEBUG || DEBUG
+	strcpy(outDesc, NAME_VERSION ":dbg built on " __DATE__ ".");
+#else
+    strcpy(outDesc, NAME_VERSION " built on " __DATE__ ".");
+#endif
     
     // Update widgets library to use modern windows:
     // (Note: this allows users with UI Zoom to get correct results!)
