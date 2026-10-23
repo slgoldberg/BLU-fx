@@ -1,6 +1,6 @@
 {
-   Copyright 2005-2012 Sandy Barbour and Ben Supnik All rights reserved.  See
-   license.txt for usage. X-Plane SDK Version: 2.1.1                          
+   Copyright 2005-2026 Laminar Research, Sandy Barbour and Ben Supnik All
+   rights reserved.  See license.txt for usage. X-Plane SDK Version: 4.0.0
 }
 
 UNIT XPWidgets;
@@ -25,7 +25,8 @@ INTERFACE
    - A text string descriptor, whose meaning varies from widget to widget.
    - An arbitrary set of 32 bit integral properties defined by 32-bit integral
      keys. This is how specific widgets store specific data.
-   - A list of widget callbacks proc that implements the widgets behaviors.
+   - A list of widget callback procedures that implements the widgets
+     behaviors.
    
    The Widgets library sends messages to widgets to request specific behaviors
    or notify the widget of things.
@@ -56,12 +57,29 @@ INTERFACE
      widget needs it or not.
    - Any widget may be a 'root' widget, causing it to be drawn; there is no
      relationship between widget class and rootness. Root widgets are
-     imlemented as XPLMDisply windows.                                        
+     implemented as XPLMDisplay windows.
 }
 
 USES
     XPWidgetDefs, XPLMDisplay;
-   {$A4}
+   {$A8}
+   {$Z4}
+
+TYPE
+   XPLMChar   = AnsiChar;
+   XPLMString = PAnsiChar;
+   PXPLMString = ^XPLMString;
+
+CONST
+{$IFDEF MSWINDOWS}
+   XPWIDGETS_DLL = 'XPWidgets_64.dll';
+{$ENDIF}
+{$IFDEF DARWIN}
+   XPWIDGETS_DLL = 'XPWidgets.framework/XPWidgets';
+{$ENDIF}
+{$IFDEF LINUX}
+   XPWIDGETS_DLL = 'XPWidgets_64.so';
+{$ENDIF}
 {___________________________________________________________________________
  * WIDGET CREATION AND MANAGEMENT
  ___________________________________________________________________________}
@@ -84,10 +102,10 @@ USES
       descriptor.
     - inIsRoot is 1 if this is going to be a root widget, 0 if it will not be.
     - inContainer is the ID of this widget's container. It must be 0 for a root
-      widget. for a non-root widget, pass the widget ID of the widget to place
+      widget. For a non-root widget, pass the widget ID of the widget to place
       this widget within. If this widget is not going to start inside another
-      widget, pass 0; this new widget will then just be floating off in space
-      (and will not be drawn until it is placed in a widget.
+      widget, pass 0; this new widget will be created but will not be drawn
+      until it is placed inside another widget.
     - inClass is the class of the widget to draw. Use one of the predefined
       class-IDs to create a standard widget.
     
@@ -95,19 +113,20 @@ USES
     etc.) if it is placed within a widget that will be called. Root widgets are
     always called. So it is possible to have whole chains of widgets that are
     simply not called. You can preconstruct widget trees and then place them
-    into root widgets later to activate them if you wish.                      
+    into root widgets later to activate them if you wish.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPCreateWidget(
-                                        inLeft              : Integer;    
-                                        inTop               : Integer;    
-                                        inRight             : Integer;    
-                                        inBottom            : Integer;    
-                                        inVisible           : Integer;    
-                                        inDescriptor        : XPLMString;    
-                                        inIsRoot            : Integer;    
-                                        inContainer         : XPWidgetID;    
-                                        inClass             : XPWidgetClass) : XPWidgetID;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inLeft              : Integer;
+                                        inTop               : Integer;
+                                        inRight             : Integer;
+                                        inBottom            : Integer;
+                                        inVisible           : Integer;
+                                        inDescriptor        : XPLMString;
+                                        inIsRoot            : Integer;
+                                        inContainer         : XPWidgetID;
+                                        inClass             : XPWidgetClass) : XPWidgetID;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPCreateCustomWidget
@@ -116,19 +135,20 @@ USES
     a class ID, you pass your widget callback function pointer defining the
     widget. Use this function to define a custom widget. All parameters are the
     same as XPCreateWidget, except that the widget class has been replaced with
-    the widget function.                                                       
+    the widget function.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPCreateCustomWidget(
-                                        inLeft              : Integer;    
-                                        inTop               : Integer;    
-                                        inRight             : Integer;    
-                                        inBottom            : Integer;    
-                                        inVisible           : Integer;    
-                                        inDescriptor        : XPLMString;    
-                                        inIsRoot            : Integer;    
-                                        inContainer         : XPWidgetID;    
-                                        inCallback          : XPWidgetFunc_t) : XPWidgetID;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inLeft              : Integer;
+                                        inTop               : Integer;
+                                        inRight             : Integer;
+                                        inBottom            : Integer;
+                                        inVisible           : Integer;
+                                        inDescriptor        : XPLMString;
+                                        inIsRoot            : Integer;
+                                        inContainer         : XPWidgetID;
+                                        inCallback          : XPWidgetFunc_t) : XPWidgetID;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPDestroyWidget
@@ -138,12 +158,13 @@ USES
     then this widget will be destroyed. (Furthermore, the widget's children
     will be destroyed with the inDestroyChildren flag set to 1, so the
     destruction will recurse down the widget tree.) If you pass 0 for this
-    flag, the child widgets will simply end up with their parent set to 0.     
+    flag, direct child widgets will simply end up with their parent set to 0.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPDestroyWidget(
-                                        inWidget            : XPWidgetID;    
-                                        inDestroyChildren   : Integer);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        inDestroyChildren   : Integer);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPSendMessageToWidget
@@ -154,20 +175,21 @@ USES
     with this method.
     
     This method supports several dispatching patterns; see XPDispatchMode for
-    more info. The function returns 1 if the message was handled, 0 if it was
-    not.
+    more info. The function returns true if the message was handled, false if
+    it was not.
     
     For each widget that receives the message (see the dispatching modes), each
     widget function from the most recently installed to the oldest one receives
-    the message in order until it is handled.                                  
+    the message in order until it is handled.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPSendMessageToWidget(
-                                        inWidget            : XPWidgetID;    
-                                        inMessage           : XPWidgetMessage;    
-                                        inMode              : XPDispatchMode;    
-                                        inParam1            : intptr_t;    
-                                        inParam2            : intptr_t) : Integer;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        inMessage           : XPWidgetMessage;
+                                        inMode              : XPDispatchMode;
+                                        inParam1            : NativeInt;
+                                        inParam2            : NativeInt) : Integer;
+    cdecl; external XPWIDGETS_DLL;
 
 {___________________________________________________________________________
  * WIDGET POSITIONING AND VISIBILITY
@@ -188,136 +210,148 @@ USES
     NOTE: this routine does not reposition the sub widget in global
     coordinates. If the container has layout management code, it will
     reposition the subwidget for you, otherwise you must do it with
-    SetWidgetGeometry.                                                         
+    SetWidgetGeometry.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPPlaceWidgetWithin(
-                                        inSubWidget         : XPWidgetID;    
-                                        inContainer         : XPWidgetID);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inSubWidget         : XPWidgetID;
+                                        inContainer         : XPWidgetID);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPCountChildWidgets
     
-    This routine returns the number of widgets another widget contains.        
+    This routine returns the number of widgets another widget contains.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPCountChildWidgets(
-                                        inWidget            : XPWidgetID) : Integer;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID) : Integer;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetNthChildWidget
     
     This routine returns the widget ID of a child widget by index. Indexes are
-    0 based, from 0 to one minus the number of widgets in the parent,
-    inclusive. If the index is invalid, 0 is returned.                         
+    0 based, from 0 to the number of widgets in the parentone minus one,
+    inclusive. If the index is invalid, 0 is returned.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPGetNthChildWidget(
-                                        inWidget            : XPWidgetID;    
-                                        inIndex             : Integer) : XPWidgetID;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        inIndex             : Integer) : XPWidgetID;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetParentWidget
     
     Returns the parent of a widget, or 0 if the widget has no parent. Root
-    widgets never have parents and therefore always return 0.                  
+    widgets never have parents and therefore always return 0.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPGetParentWidget(
-                                        inWidget            : XPWidgetID) : XPWidgetID;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID) : XPWidgetID;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPShowWidget
     
     This routine makes a widget visible if it is not already. Note that if a
     widget is not in a rooted widget hierarchy or one of its parents is not
-    visible, it will still not be visible to the user.                         
+    visible, it will still not be visible to the user.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPShowWidget(
-                                        inWidget            : XPWidgetID);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPHideWidget
     
     Makes a widget invisible. See XPShowWidget for considerations of when a
-    widget might not be visible despite its own visibility state.              
+    widget might not be visible despite its own visibility state.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPHideWidget(
-                                        inWidget            : XPWidgetID);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPIsWidgetVisible
     
     This returns 1 if a widget is visible, 0 if it is not. Note that this
     routine takes into consideration whether a parent is invisible. Use this
-    routine to tell if the user can see the widget.                            
+    routine to tell if the user can see the widget.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPIsWidgetVisible(
-                                        inWidget            : XPWidgetID) : Integer;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID) : Integer;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPFindRootWidget
     
     Returns the Widget ID of the root widget that contains the passed in widget
-    or NULL if the passed in widget is not in a rooted hierarchy.              
+    or NULL if the passed in widget is not in a rooted hierarchy.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPFindRootWidget(
-                                        inWidget            : XPWidgetID) : XPWidgetID;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID) : XPWidgetID;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPBringRootWidgetToFront
     
-    This routine makes the specified widget be in the front most widget
+    This routine makes the specified widget be in the frontmost widget
     hierarchy. If this widget is a root widget, its widget hierarchy comes to
     front, otherwise the widget's root is brought to the front. If this widget
     is not in an active widget hiearchy (e.g. there is no root widget at the
-    top of the tree), this routine does nothing.                               
+    top of the tree), this routine does nothing.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPBringRootWidgetToFront(
-                                        inWidget            : XPWidgetID);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPIsWidgetInFront
     
-    This routine returns true if this widget's hierarchy is the front most
+    This routine returns true if this widget's hierarchy is the frontmost
     hierarchy. It returns false if the widget's hierarchy is not in front, or
-    if the widget is not in a rooted hierarchy.                                
+    if the widget is not in a rooted hierarchy.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPIsWidgetInFront(
-                                        inWidget            : XPWidgetID) : Integer;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID) : Integer;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWidgetGeometry
     
     This routine returns the bounding box of a widget in global coordinates.
-    Pass NULL for any parameter you are not interested in.                     
+    Pass NULL for any parameter you are not interested in.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPGetWidgetGeometry(
-                                        inWidget            : XPWidgetID;    
+                                        inWidget            : XPWidgetID;
                                         outLeft             : PInteger;    { Can be nil }
                                         outTop              : PInteger;    { Can be nil }
                                         outRight            : PInteger;    { Can be nil }
                                         outBottom           : PInteger);    { Can be nil }
-    cdecl; external XPWIDGETS.DLL;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPSetWidgetGeometry
     
-    This function changes the bounding box of a widget.                        
+    This function changes the bounding box of a widget.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPSetWidgetGeometry(
-                                        inWidget            : XPWidgetID;    
-                                        inLeft              : Integer;    
-                                        inTop               : Integer;    
-                                        inRight             : Integer;    
-                                        inBottom            : Integer);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        inLeft              : Integer;
+                                        inTop               : Integer;
+                                        inRight             : Integer;
+                                        inBottom            : Integer);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWidgetForLocation
@@ -334,34 +368,36 @@ USES
     NOTE: if a widget's geometry extends outside its parents geometry, it will
     not be returned by this call for mouse locations outside the parent
     geometry. The parent geometry limits the child's eligibility for mouse
-    location.                                                                  
+    location.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPGetWidgetForLocation(
-                                        inContainer         : XPWidgetID;    
-                                        inXOffset           : Integer;    
-                                        inYOffset           : Integer;    
-                                        inRecursive         : Integer;    
-                                        inVisibleOnly       : Integer) : XPWidgetID;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inContainer         : XPWidgetID;
+                                        inXOffset           : Integer;
+                                        inYOffset           : Integer;
+                                        inRecursive         : Integer;
+                                        inVisibleOnly       : Integer) : XPWidgetID;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWidgetExposedGeometry
     
     This routine returns the bounds of the area of a widget that is completely
     within its parent widgets. Since a widget's bounding box can be outside its
-    parent, part of its area will not be elligible for mouse clicks and should
+    parent, part of its area will not be eligible for mouse clicks and should
     not draw. Use XPGetWidgetGeometry to find out what area defines your
     widget's shape, but use this routine to find out what area to actually draw
     into. Note that the widget library does not use OpenGL clipping to keep
-    frame rates up, although you could use it internally.                      
+    frame rates up, although you could use it internally.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPGetWidgetExposedGeometry(
-                                        inWidgetID          : XPWidgetID;    
+                                        inWidgetID          : XPWidgetID;
                                         outLeft             : PInteger;    { Can be nil }
                                         outTop              : PInteger;    { Can be nil }
                                         outRight            : PInteger;    { Can be nil }
                                         outBottom           : PInteger);    { Can be nil }
-    cdecl; external XPWIDGETS.DLL;
+    cdecl; external XPWIDGETS_DLL;
 
 {___________________________________________________________________________
  * ACCESSING WIDGET DATA
@@ -376,12 +412,13 @@ USES
     descriptor is the text being edited. In other words, the usage for the text
     varies from widget to widget, but this API provides a universal and
     convenient way to get at it. While not all UI widgets need their
-    descriptor, many do.                                                       
+    descriptor, many do.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPSetWidgetDescriptor(
-                                        inWidget            : XPWidgetID;    
-                                        inDescriptor        : XPLMString);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        inDescriptor        : XPLMString);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWidgetDescriptor
@@ -392,13 +429,14 @@ USES
     descriptor; if you pass NULL for outDescriptor, you can get the
     descriptor's length without getting its text. If the length of the
     descriptor exceeds your buffer length, the buffer will not be null
-    terminated (this routine has 'strncpy' semantics).                         
+    terminated (this routine has 'strncpy' semantics).
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPGetWidgetDescriptor(
-                                        inWidget            : XPWidgetID;    
-                                        outDescriptor       : XPLMString;    
-                                        inMaxDescLength     : Integer) : Integer;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        outDescriptor       : XPLMString;
+                                        inMaxDescLength     : Integer) : Integer;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWidgetUnderlyingWindow
@@ -408,23 +446,25 @@ USES
     XPLMEnableFeature("XPLM_USE_NATIVE_WIDGET_WINDOWS", 1), you can use the
     returned window ID for display APIs like XPLMSetWindowPositioningMode(),
     allowing you to pop the widget window out into a real OS window, or move it
-    into VR.                                                                   
+    into VR.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPGetWidgetUnderlyingWindow(
-                                        inWidget            : XPWidgetID) : XPLMWindowID;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID) : XPLMWindowID;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPSetWidgetProperty
     
     This function sets a widget's property. Properties are arbitrary values
-    associated by a widget by ID.                                              
+    associated by a widget by ID.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPSetWidgetProperty(
-                                        inWidget            : XPWidgetID;    
-                                        inProperty          : XPWidgetPropertyID;    
-                                        inValue             : intptr_t);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        inProperty          : XPWidgetPropertyID;
+                                        inValue             : NativeInt);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWidgetProperty
@@ -433,13 +473,14 @@ USES
     is not defined. If you need to know whether the property is defined, pass a
     pointer to an int for inExists; the existence of that property will be
     returned in the int. Pass NULL for inExists if you do not need this
-    information.                                                               
+    information.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPGetWidgetProperty(
-                                        inWidget            : XPWidgetID;    
-                                        inProperty          : XPWidgetPropertyID;    
-                                        inExists            : PInteger) : intptr_t;    { Can be nil }
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        inProperty          : XPWidgetPropertyID;
+                                        inExists            : PInteger) : NativeInt;    { Can be nil }
+    cdecl; external XPWIDGETS_DLL;
 
 {___________________________________________________________________________
  * KEYBOARD MANAGEMENT
@@ -459,32 +500,35 @@ USES
     for X-Plane.
     
     Keyboard focus is not changed if the new widget will not accept it. For
-    setting to X-Plane, keyboard focus is always accepted.                     
+    setting to X-Plane, keyboard focus is always accepted.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPSetKeyboardFocus(
-                                        inWidget            : XPWidgetID) : XPWidgetID;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID) : XPWidgetID;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPLoseKeyboardFocus
     
     This causes the specified widget to lose focus; focus is passed to its
     parent, or the next parent that will accept it. This routine does nothing
-    if this widget does not have focus.                                        
+    if this widget does not have focus.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPLoseKeyboardFocus(
-                                        inWidget            : XPWidgetID);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWidgetWithFocus
     
     This routine returns the widget that has keyboard focus, or 0 if X-Plane
     has keyboard focus or some other plugin window that does not have widgets
-    has focus.                                                                 
+    has focus.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPGetWidgetWithFocus: XPWidgetID;
-    cdecl; external XPWIDGETS.DLL;
+    cdecl; external XPWIDGETS_DLL;
 
 {___________________________________________________________________________
  * CREATING CUSTOM WIDGETS
@@ -504,22 +548,24 @@ USES
     
     This provides a way to 'subclass' an existing widget. By providing a second
     hook that only handles certain widget messages, you can customize or extend
-    widget behavior.                                                           
+    widget behavior.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPAddWidgetCallback(
-                                        inWidget            : XPWidgetID;    
-                                        inNewCallback       : XPWidgetFunc_t);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidget            : XPWidgetID;
+                                        inNewCallback       : XPWidgetFunc_t);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWidgetClassFunc
     
     Given a widget class, this function returns the callbacks that power that
-    widget class.                                                              
+    widget class.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPGetWidgetClassFunc(
-                                        inWidgetClass       : XPWidgetClass) : XPWidgetFunc_t;    
-    cdecl; external XPWIDGETS.DLL;
+                                        inWidgetClass       : XPWidgetClass) : XPWidgetFunc_t;
+    cdecl; external XPWIDGETS_DLL;
 
 
 IMPLEMENTATION

@@ -3,7 +3,16 @@ SRC_BASE	:=	.
 TARGET		:= blu_fx
 
 SOURCES = \
-	blu_fx.cpp
+	blu_fx.cpp \
+	settings-img-window.cpp \
+	ImGui/imgui.cpp \
+	ImGui/imgui_demo.cpp \
+	ImGui/imgui_draw.cpp \
+	ImGui/imgui_tables.cpp \
+	ImGui/imgui_widgets.cpp \
+	ImGui/misc/cpp/imgui_stdlib.cpp \
+	ImgWindow/ImgFontAtlas.cpp \
+	ImgWindow/ImgWindow.cpp
 
 LIBS = $(SRC_BASE)/SDK/Libraries/Mac/XPLM.framework/XPLM \
 	$(SRC_BASE)/SDK/Libraries/Mac/XPWidgets.framework/XPWidgets \
@@ -11,9 +20,15 @@ LIBS = $(SRC_BASE)/SDK/Libraries/Mac/XPLM.framework/XPLM \
 
 INCLUDES = \
 	-I$(SRC_BASE)/SDK/CHeaders/XPLM \
-	-I$(SRC_BASE)/SDK/CHeaders/Widgets
+	-I$(SRC_BASE)/SDK/CHeaders/Widgets \
+	-I$(SRC_BASE)/ImGui \
+	-I$(SRC_BASE)/ImGui/misc/cpp \
+	-I$(SRC_BASE)/ImgWindow \
+	-I$(SRC_BASE)
 
-DEFINES = -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DAPL=1 -DIBM=0 -DLIN=0 \
+DEFINES = -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DXPLM303=1 \
+		  -DIMGWINDOW_USE_PANEL_GRAPHICS \
+		  -DAPL=1 -DIBM=0 -DLIN=0 \
 		  -DGL_GLEXT_PROTOTYPES -DGL_SILENCE_DEPRECATION
 
 ############################################################################
@@ -32,7 +47,7 @@ ALL_DEPS64		:= $(sort $(CDEPS64) $(CXXDEPS64))
 ALL_OBJECTS64	:= $(sort $(COBJECTS64) $(CXXOBJECTS64))
 
 CFLAGS := $(DEFINES) $(INCLUDES) -fPIC -fvisibility=hidden -fpermissive \
-			-std=c++11 -w
+			-std=c++17 -w
 
 # Phony directive tells make that these are "virtual" targets, even if a file named "clean" exists.
 .PHONY: all clean $(TARGET)

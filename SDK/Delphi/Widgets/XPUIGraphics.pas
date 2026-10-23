@@ -1,14 +1,31 @@
 {
-   Copyright 2005-2012 Sandy Barbour and Ben Supnik All rights reserved.  See
-   license.txt for usage. X-Plane SDK Version: 2.1.1                          
+   Copyright 2005-2026 Laminar Research, Sandy Barbour and Ben Supnik All
+   rights reserved.  See license.txt for usage. X-Plane SDK Version: 4.0.0
 }
 
 UNIT XPUIGraphics;
 INTERFACE
 
 USES
-    XPWidgetDefs;
-   {$A4}
+    XPWidgetDefs, XPLMGraphics;
+   {$A8}
+   {$Z4}
+
+TYPE
+   XPLMChar   = AnsiChar;
+   XPLMString = PAnsiChar;
+   PXPLMString = ^XPLMString;
+
+CONST
+{$IFDEF MSWINDOWS}
+   XPWIDGETS_DLL = 'XPWidgets_64.dll';
+{$ENDIF}
+{$IFDEF DARWIN}
+   XPWIDGETS_DLL = 'XPWidgets.framework/XPWidgets';
+{$ENDIF}
+{$IFDEF LINUX}
+   XPWIDGETS_DLL = 'XPWidgets_64.so';
+{$ENDIF}
 {___________________________________________________________________________
  * UI GRAPHICS
  ___________________________________________________________________________}
@@ -19,9 +36,9 @@ USES
     There are a few built-in window styles in X-Plane that you can use.
     
     Note that X-Plane 6 does not offer real shadow-compositing; you must make
-    sure to put a window on top of another window of the right style to the
-    shadows work, etc. This applies to elements with insets and shadows. The
-    rules are:
+    sure to put a window on top of another window of the right style to make
+    the shadows work, etc. This applies to elements with insets and shadows.
+    The rules are:
     
     Sub windows must go on top of main windows, and screens and list views on
     top of subwindows. Only help and main windows can be over the main screen.
@@ -31,7 +48,7 @@ USES
     Some windows are scaled by stretching, some by repeating. The drawing
     routines know which scaling method to use. The list view cannot be rescaled
     in X-Plane 6 because it has both a repeating pattern and a gradient in one
-    element. All other elements can be rescaled.                               
+    element. All other elements can be rescaled.
    }
 TYPE
    XPWindowStyle = (
@@ -59,27 +76,29 @@ TYPE
     This routine draws a window of the given dimensions at the given offset on
     the virtual screen in a given style. The window is automatically scaled as
     appropriate using a bitmap scaling technique (scaling or repeating) as
-    appropriate to the style.                                                  
+    appropriate to the style.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPDrawWindow(
-                                        inX1                : Integer;    
-                                        inY1                : Integer;    
-                                        inX2                : Integer;    
-                                        inY2                : Integer;    
-                                        inStyle             : XPWindowStyle);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inX1                : Integer;
+                                        inY1                : Integer;
+                                        inX2                : Integer;
+                                        inY2                : Integer;
+                                        inStyle             : XPWindowStyle);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetWindowDefaultDimensions
     
     This routine returns the default dimensions for a window. Output is either
-    a minimum or fixed value depending on whether the window is scalable.      
+    a minimum or fixed value depending on whether the window is scalable.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPGetWindowDefaultDimensions(
-                                        inStyle             : XPWindowStyle;    
+                                        inStyle             : XPWindowStyle;
                                         outWidth            : PInteger;    { Can be nil }
                                         outHeight           : PInteger);    { Can be nil }
-    cdecl; external XPWIDGETS.DLL;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPElementStyle
@@ -92,7 +111,7 @@ TYPE
     In X-Plane 6 some elements must be drawn over metal. Some are scalable and
     some are not. Any element can be drawn anywhere in X-Plane 7.
     
-    Scalable Axis Required Background                                          
+    Scalable Axis Required Background
    }
 TYPE
    XPElementStyle = (
@@ -211,34 +230,35 @@ TYPE
     XPDrawElement
     
     XPDrawElement draws a given element at an offset on the virtual screen in
-    set dimensions.
-    *Even* if the element is not scalable, it will be scaled if the width and
-     height do not match the preferred dimensions; it'll just look ugly. Pass
-     inLit to see the lit version of the element; if the element cannot be lit
-     this is ignored.                                                          
+    set dimensions. Even if the element is not scalable, it will be scaled if
+    the width and height do not match the preferred dimensions; it'll just look
+    ugly. Pass inLit to see the lit version of the element; if the element
+    cannot be lit this is ignored.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPDrawElement(
-                                        inX1                : Integer;    
-                                        inY1                : Integer;    
-                                        inX2                : Integer;    
-                                        inY2                : Integer;    
-                                        inStyle             : XPElementStyle;    
-                                        inLit               : Integer);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inX1                : Integer;
+                                        inY1                : Integer;
+                                        inX2                : Integer;
+                                        inY2                : Integer;
+                                        inStyle             : XPElementStyle;
+                                        inLit               : Integer);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetElementDefaultDimensions
     
     This routine returns the recommended or minimum dimensions of a given UI
     element. outCanBeLit tells whether the element has both a lit and unlit
-    state. Pass `NULL` to not receive any of these parameters.                 
+    state. Pass NULL to not receive any of these parameters.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPGetElementDefaultDimensions(
-                                        inStyle             : XPElementStyle;    
+                                        inStyle             : XPElementStyle;
                                         outWidth            : PInteger;    { Can be nil }
                                         outHeight           : PInteger;    { Can be nil }
                                         outCanBeLit         : PInteger);    { Can be nil }
-    cdecl; external XPWIDGETS.DLL;
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPTrackStyle
@@ -253,7 +273,7 @@ TYPE
     - ScrollBar: this is a standard scroll bar with arrows and a thumb to drag.
     - Slider: this is a simple track with a ball in the middle that can be
       slid.
-    - Progress: this is a progress indicator showing how a long task is going. 
+    - Progress: this is a progress indicator showing how a long task is going.
    }
 TYPE
    XPTrackStyle = (
@@ -276,32 +296,34 @@ TYPE
     track picks the optimal orientation for these dimensions. Pass in the
     track's minimum current and maximum values; the indicator will be
     positioned appropriately. You can also specify whether the track is lit or
-    not.                                                                       
+    not.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPDrawTrack(
-                                        inX1                : Integer;    
-                                        inY1                : Integer;    
-                                        inX2                : Integer;    
-                                        inY2                : Integer;    
-                                        inMin               : Integer;    
-                                        inMax               : Integer;    
-                                        inValue             : Integer;    
-                                        inTrackStyle        : XPTrackStyle;    
-                                        inLit               : Integer);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inX1                : Integer;
+                                        inY1                : Integer;
+                                        inX2                : Integer;
+                                        inY2                : Integer;
+                                        inMin               : Integer;
+                                        inMax               : Integer;
+                                        inValue             : Integer;
+                                        inTrackStyle        : XPTrackStyle;
+                                        inLit               : Integer);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetTrackDefaultDimensions
     
     This routine returns a track's default smaller dimension; all tracks are
     scalable in the larger dimension. It also returns whether a track can be
-    lit.                                                                       
+    lit.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPGetTrackDefaultDimensions(
-                                        inStyle             : XPTrackStyle;    
-                                        outWidth            : PInteger;    
-                                        outCanBeLit         : PInteger);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inStyle             : XPTrackStyle;
+                                        outWidth            : PInteger;
+                                        outCanBeLit         : PInteger);
+    cdecl; external XPWIDGETS_DLL;
 
    {
     XPGetTrackMetrics
@@ -317,24 +339,43 @@ TYPE
     Besides orientation, you get five dimensions for the five parts of a
     scrollbar, which are the down button, down area (area before the thumb),
     the thumb, and the up area and button. For horizontal scrollers, the left
-    button decreases; for vertical scrollers, the top button decreases.        
+    button decreases; for vertical scrollers, the top button decreases.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPGetTrackMetrics(
-                                        inX1                : Integer;    
-                                        inY1                : Integer;    
-                                        inX2                : Integer;    
-                                        inY2                : Integer;    
-                                        inMin               : Integer;    
-                                        inMax               : Integer;    
-                                        inValue             : Integer;    
-                                        inTrackStyle        : XPTrackStyle;    
-                                        outIsVertical       : PInteger;    
-                                        outDownBtnSize      : PInteger;    
-                                        outDownPageSize     : PInteger;    
-                                        outThumbSize        : PInteger;    
-                                        outUpPageSize       : PInteger;    
-                                        outUpBtnSize        : PInteger);    
-    cdecl; external XPWIDGETS.DLL;
+                                        inX1                : Integer;
+                                        inY1                : Integer;
+                                        inX2                : Integer;
+                                        inY2                : Integer;
+                                        inMin               : Integer;
+                                        inMax               : Integer;
+                                        inValue             : Integer;
+                                        inTrackStyle        : XPTrackStyle;
+                                        outIsVertical       : PInteger;
+                                        outDownBtnSize      : PInteger;
+                                        outDownPageSize     : PInteger;
+                                        outThumbSize        : PInteger;
+                                        outUpPageSize       : PInteger;
+                                        outUpBtnSize        : PInteger);
+    cdecl; external XPWIDGETS_DLL;
+
+{___________________________________________________________________________
+ * Host API
+ ___________________________________________________________________________}
+
+CONST
+   XPLMGraphicsHostApiVersion = 0;
+
+
+
+
+
+
+
+
+
+
+
 
 
 IMPLEMENTATION

@@ -6,19 +6,22 @@
 #     (NOTE: not supported; this comment was copied ... :-) )
 
 cmake_minimum_required(VERSION 3.9)
-project(blu_fx VERSION 2.7.5 DESCRIPTION "Blu-FX X-Plane plugin")
+project(blu_fx VERSION 2.0.0 DESCRIPTION "Blu-FX X-Plane plugin")
 
 # By default, use optimized release configuration.
 if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif ()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # Set include directories used by our code and dependencies.
 include_directories("${CMAKE_SOURCE_DIR}/SDK/CHeaders/XPLM")
 include_directories("${CMAKE_SOURCE_DIR}/SDK/CHeaders/Widgets")
 include_directories("${CMAKE_SOURCE_DIR}/GLee5_4")
+include_directories("${CMAKE_SOURCE_DIR}/ImGui")
+include_directories("${CMAKE_SOURCE_DIR}/ImGui/misc/cpp")
+include_directories("${CMAKE_SOURCE_DIR}/ImgWindow")
 include_directories("${CMAKE_SOURCE_DIR}/.")
 
 if (WIN32)
@@ -38,12 +41,17 @@ elseif (UNIX)
     # any other dependencies here
 endif ()
 
-# Enable all X-Plane SDK APIs up to the newest version.
-add_definitions(-DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1)
+# Enable all X-Plane SDK APIs up to 3xx (and DO NOT define XPLM440 so we support XP11.10+ cleanly).
+add_definitions(-DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DXPLM303=1)
+# Enable ImgWindow v2 dynamic Panel Graphics support (XP12.4.4+ with automatic OpenGL fallback):
+add_definitions(-DIMGWINDOW_USE_PANEL_GRAPHICS)
 # Define platform macros.
 add_definitions(-DAPL=$<BOOL:${APPLE}> -DIBM=$<BOOL:${WIN32}> -DLIN=$<AND:$<BOOL:${UNIX}>,$<NOT:$<BOOL:${APPLE}>>>)
 # Define GLEXT prototypes option:
 add_definitions(-DGL_GLEXT_PROTOTYPES)
+if (APPLE)
+    add_definitions(-DGL_SILENCE_DEPRECATION)
+endif ()
 
 # Force-enable exception support. This is most likely redundant, although for C
 # code the default is the opposite. Since we are mixing C++ and C libraries,
@@ -71,12 +79,24 @@ add_compile_options(-O3 -fPIC)
 # Turn on Debug mode
 # add_compile_options(-g)
 
-# X-Plane plugin
-list(APPEND BLUFX_SRCS blu_fx.cpp GLee5_4/GLee.c)
+# X-Plane plugin sources
+list(APPEND BLUFX_SRCS
+    blu_fx.cpp
+    settings-img-window.cpp
+    GLee5_4/GLee.c
+    ImGui/imgui.cpp
+    ImGui/imgui_demo.cpp
+    ImGui/imgui_draw.cpp
+    ImGui/imgui_tables.cpp
+    ImGui/imgui_widgets.cpp
+    ImGui/misc/cpp/imgui_stdlib.cpp
+    ImgWindow/ImgFontAtlas.cpp
+    ImgWindow/ImgWindow.cpp
+)
 
 add_library(blu_fx SHARED ${BLUFX_SRCS})
 
-target_compile_features(blu_fx PUBLIC cxx_std_11)
+target_compile_features(blu_fx PUBLIC cxx_std_17)
 
 if (APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING

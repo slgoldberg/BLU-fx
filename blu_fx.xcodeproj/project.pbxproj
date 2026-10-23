@@ -10,6 +10,15 @@
 		AA15C19F22F2AB5900F8C3E8 /* blu_fx.xpl in CopyFiles */ = {isa = PBXBuildFile; fileRef = D607B19909A556E400699BC3 /* blu_fx.xpl */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		AA2B19432C2E1BBA00AEEBA9 /* blu_fx.xpl in CopyFiles */ = {isa = PBXBuildFile; fileRef = D607B19909A556E400699BC3 /* blu_fx.xpl */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		D67297EB0F9E0FCC00CFD1FA /* blu_fx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D67297EA0F9E0FCC00CFD1FA /* blu_fx.cpp */; };
+		E10000110000000000000001 /* settings-img-window.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000010000000000000001 /* settings-img-window.cpp */; };
+		E10000120000000000000001 /* imgui.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000020000000000000001 /* imgui.cpp */; };
+		E10000130000000000000001 /* imgui_demo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000030000000000000001 /* imgui_demo.cpp */; };
+		E10000140000000000000001 /* imgui_draw.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000040000000000000001 /* imgui_draw.cpp */; };
+		E10000150000000000000001 /* imgui_tables.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000050000000000000001 /* imgui_tables.cpp */; };
+		E10000160000000000000001 /* imgui_widgets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000060000000000000001 /* imgui_widgets.cpp */; };
+		E10000170000000000000001 /* imgui_stdlib.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000070000000000000001 /* imgui_stdlib.cpp */; };
+		E10000180000000000000001 /* ImgFontAtlas.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000080000000000000001 /* ImgFontAtlas.cpp */; };
+		E10000190000000000000001 /* ImgWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E10000090000000000000001 /* ImgWindow.cpp */; };
 		D6A7BDAA16A1DEA200D1426A /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6A7BDA916A1DEA200D1426A /* OpenGL.framework */; };
 		D6A7BDC116A1DEC000D1426A /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6A7BDC016A1DEC000D1426A /* CoreFoundation.framework */; };
 		D6A7BDF116A1DED200D1426A /* XPLM.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6A7BDF016A1DED200D1426A /* XPLM.framework */; };
@@ -43,6 +52,17 @@
 		AA6378EF2C5C5B7500D865B0 /* tools */ = {isa = PBXFileReference; lastKnownFileType = folder; path = tools; sourceTree = "<group>"; };
 		D607B19909A556E400699BC3 /* blu_fx.xpl */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = blu_fx.xpl; sourceTree = BUILT_PRODUCTS_DIR; };
 		D67297EA0F9E0FCC00CFD1FA /* blu_fx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = blu_fx.cpp; sourceTree = "<group>"; };
+		E10000010000000000000001 /* settings-img-window.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "settings-img-window.cpp"; sourceTree = "<group>"; };
+		E100000A0000000000000001 /* blu_fx.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = blu_fx.h; sourceTree = "<group>"; };
+		E100000B0000000000000001 /* settings-img-window.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "settings-img-window.h"; sourceTree = "<group>"; };
+		E10000020000000000000001 /* imgui.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ImGui/imgui.cpp; sourceTree = "<group>"; };
+		E10000030000000000000001 /* imgui_demo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ImGui/imgui_demo.cpp; sourceTree = "<group>"; };
+		E10000040000000000000001 /* imgui_draw.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ImGui/imgui_draw.cpp; sourceTree = "<group>"; };
+		E10000050000000000000001 /* imgui_tables.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ImGui/imgui_tables.cpp; sourceTree = "<group>"; };
+		E10000060000000000000001 /* imgui_widgets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ImGui/imgui_widgets.cpp; sourceTree = "<group>"; };
+		E10000070000000000000001 /* imgui_stdlib.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ImGui/misc/cpp/imgui_stdlib.cpp; sourceTree = "<group>"; };
+		E10000080000000000000001 /* ImgFontAtlas.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ImgWindow/ImgFontAtlas.cpp; sourceTree = "<group>"; };
+		E10000090000000000000001 /* ImgWindow.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ImgWindow/ImgWindow.cpp; sourceTree = "<group>"; };
 		D6A7BDA916A1DEA200D1426A /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
 		D6A7BDC016A1DEC000D1426A /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		D6A7BDF016A1DED200D1426A /* XPLM.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XPLM.framework; path = SDK/Libraries/Mac/XPLM.framework; sourceTree = "<group>"; };
@@ -67,7 +87,18 @@
 		AC4E46B809C2E0B3006B7E1B /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				E100000A0000000000000001 /* blu_fx.h */,
 				D67297EA0F9E0FCC00CFD1FA /* blu_fx.cpp */,
+				E100000B0000000000000001 /* settings-img-window.h */,
+				E10000010000000000000001 /* settings-img-window.cpp */,
+				E10000020000000000000001 /* imgui.cpp */,
+				E10000030000000000000001 /* imgui_demo.cpp */,
+				E10000040000000000000001 /* imgui_draw.cpp */,
+				E10000050000000000000001 /* imgui_tables.cpp */,
+				E10000060000000000000001 /* imgui_widgets.cpp */,
+				E10000070000000000000001 /* imgui_stdlib.cpp */,
+				E10000080000000000000001 /* ImgFontAtlas.cpp */,
+				E10000090000000000000001 /* ImgWindow.cpp */,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -158,6 +189,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				D67297EB0F9E0FCC00CFD1FA /* blu_fx.cpp in Sources */,
+				E10000110000000000000001 /* settings-img-window.cpp in Sources */,
+				E10000120000000000000001 /* imgui.cpp in Sources */,
+				E10000130000000000000001 /* imgui_demo.cpp in Sources */,
+				E10000140000000000000001 /* imgui_draw.cpp in Sources */,
+				E10000150000000000000001 /* imgui_tables.cpp in Sources */,
+				E10000160000000000000001 /* imgui_widgets.cpp in Sources */,
+				E10000170000000000000001 /* imgui_stdlib.cpp in Sources */,
+				E10000180000000000000001 /* ImgFontAtlas.cpp in Sources */,
+				E10000190000000000000001 /* ImgWindow.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +228,7 @@
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				DEAD_CODE_STRIPPING = YES;
 				DYLIB_COMPATIBILITY_VERSION = "";
 				DYLIB_CURRENT_VERSION = "";
@@ -205,6 +246,8 @@
 					"XPLM210=1",
 					"XPLM300=1",
 					"XPLM301=1",
+					"XPLM303=1",
+					IMGWINDOW_USE_PANEL_GRAPHICS,
 					GL_SILENCE_DEPRECATION,
 				);
 				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
@@ -218,6 +261,10 @@
 				HEADER_SEARCH_PATHS = (
 					"$(XPSDK_ROOT)/CHeaders/Widgets",
 					"$(XPSDK_ROOT)/CHeaders/XPLM",
+					ImGui,
+					ImGui/misc/cpp,
+					ImgWindow,
+					.,
 					"$(HEADER_SEARCH_PATHS)",
 				);
 				INSTALL_PATH = blu_fx/mac_x64;
@@ -260,6 +307,7 @@
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				DEAD_CODE_STRIPPING = YES;
 				DYLIB_COMPATIBILITY_VERSION = "";
 				DYLIB_CURRENT_VERSION = "";
@@ -276,6 +324,8 @@
 					"XPLM210=1",
 					"XPLM300=1",
 					"XPLM301=1",
+					"XPLM303=1",
+					IMGWINDOW_USE_PANEL_GRAPHICS,
 					GL_SILENCE_DEPRECATION,
 				);
 				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
@@ -289,6 +339,10 @@
 				HEADER_SEARCH_PATHS = (
 					"$(XPSDK_ROOT)/CHeaders/Widgets",
 					"$(XPSDK_ROOT)/CHeaders/XPLM",
+					ImGui,
+					ImGui/misc/cpp,
+					ImgWindow,
+					.,
 					"$(HEADER_SEARCH_PATHS)",
 				);
 				INSTALL_PATH = blu_fx/mac_x64;

@@ -1,0 +1,3 @@
+[submodule "ImgWindow"]
+	path = ImgWindow
+	url = https://github.com/slgoldberg/ImgWindow.git

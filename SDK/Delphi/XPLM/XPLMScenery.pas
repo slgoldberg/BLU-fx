@@ -1,17 +1,34 @@
 {
-   Copyright 2005-2012 Sandy Barbour and Ben Supnik All rights reserved.  See
-   license.txt for usage. X-Plane SDK Version: 2.1.1                          
+   Copyright 2005-2026 Laminar Research, Sandy Barbour and Ben Supnik All
+   rights reserved.  See license.txt for usage. X-Plane SDK Version: 4.0.0
 }
 
 UNIT XPLMScenery;
 INTERFACE
 {
-   This package contains APIs to interact with X-Plane's scenery system.      
+   This package contains APIs to interact with X-Plane's scenery system.
 }
 
 USES
     XPLMDefs;
-   {$A4}
+   {$A8}
+   {$Z4}
+
+TYPE
+   XPLMChar   = AnsiChar;
+   XPLMString = PAnsiChar;
+   PXPLMString = ^XPLMString;
+
+CONST
+{$IFDEF MSWINDOWS}
+   XPLM_DLL = 'XPLM_64.dll';
+{$ENDIF}
+{$IFDEF DARWIN}
+   XPLM_DLL = 'XPLM.framework/XPLM';
+{$ENDIF}
+{$IFDEF LINUX}
+   XPLM_DLL = 'XPLM_64.so';
+{$ENDIF}
 {$IFDEF XPLM200}
 {___________________________________________________________________________
  * Terrain Y-Testing
@@ -35,7 +52,7 @@ USES
    probing operations are expensive, and should be avoided via caching when
    possible.
    
-   Y testing returns a location on the terrain, a normal vectory, and a
+   Y testing returns a location on the terrain, a normal vector, and a
    velocity vector. The normal vector tells you the slope of the terrain at
    that point. The velocity vector tells you if that terrain is moving (and is
    in meters/second). For example, if your Y test hits the aircraft carrier
@@ -43,7 +60,7 @@ USES
    
    Note: the Y-testing API is limited to probing the loaded scenery area,
    which is approximately 300x300 km in X-Plane 9. Probes outside this area
-   will return the height of a 0 MSL sphere.                                  
+   will return the height of a 0 MSL sphere.
 }
 
 
@@ -52,7 +69,7 @@ USES
     
     XPLMProbeType defines the type of terrain probe - each probe has a
     different algorithm. (Only one type of probe is provided right now, but
-    future APIs will expose more flexible or poewrful or useful probes.        
+    future APIs will expose more flexible or powerful or useful probes.
    }
 TYPE
    XPLMProbeType = (
@@ -66,14 +83,14 @@ TYPE
    {
     XPLMProbeResult
     
-    Probe results - possible results from a probe query.                       
+    Probe results - possible results from a probe query.
    }
    XPLMProbeResult = (
      { The probe hit terrain and returned valid values.                           }
       xplm_ProbeHitTerrain                     = 0
  
-     { An error in the API call.  Either the probe struct size is bad, or the     }
-     { probe is invalid or the type is mismatched for the specific query call.    }
+     { An error in the API call.  Either the probe struct size is bad, the probe  }
+     { is invalid, or the type is mismatched for the specific query call.         }
      ,xplm_ProbeError                          = 1
  
      { The probe call succeeded but there is no terrain under this point (perhaps }
@@ -87,7 +104,7 @@ TYPE
     XPLMProbeRef
     
     An XPLMProbeRef is an opaque handle to a probe, used for querying the
-    terrain.                                                                   
+    terrain.
    }
    XPLMProbeRef = pointer;
    PXPLMProbeRef = ^XPLMProbeRef;
@@ -96,7 +113,7 @@ TYPE
     XPLMProbeInfo_t
     
     XPLMProbeInfo_t contains the results of a probe call. Make sure to set
-    structSize to the size of the struct before using it.                      
+    structSize to the size of the struct before using it.
    }
    XPLMProbeInfo_t = RECORD
      { Size of structure in bytes - always set this before calling the XPLM.      }
@@ -130,19 +147,21 @@ TYPE
    {
     XPLMCreateProbe
     
-    Creates a new probe object of a given type and returns.                    
+    Creates a new probe object of a given type and returns.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPLMCreateProbe(
-                                        inProbeType         : XPLMProbeType) : XPLMProbeRef;    
+                                        inProbeType         : XPLMProbeType) : XPLMProbeRef;
     cdecl; external XPLM_DLL;
 
    {
     XPLMDestroyProbe
     
-    Deallocates an existing probe object.                                      
+    Deallocates an existing probe object.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPLMDestroyProbe(
-                                        inProbe             : XPLMProbeRef);    
+                                        inProbe             : XPLMProbeRef);
     cdecl; external XPLM_DLL;
 
    {
@@ -151,14 +170,15 @@ TYPE
     Probes the terrain. Pass in the XYZ coordinate of the probe point, a probe
     object, and an XPLMProbeInfo_t struct that has its structSize member set
     properly. Other fields are filled in if we hit terrain, and a probe result
-    is returned.                                                               
+    is returned.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPLMProbeTerrainXYZ(
-                                        inProbe             : XPLMProbeRef;    
-                                        inX                 : Single;    
-                                        inY                 : Single;    
-                                        inZ                 : Single;    
-                                        outInfo             : PXPLMProbeInfo_t) : XPLMProbeResult;    
+                                        inProbe             : XPLMProbeRef;
+                                        inX                 : Single;
+                                        inY                 : Single;
+                                        inZ                 : Single;
+                                        outInfo             : PXPLMProbeInfo_t) : XPLMProbeResult;
     cdecl; external XPLM_DLL;
 
 {$ENDIF XPLM200}
@@ -176,7 +196,7 @@ TYPE
    necessarily match what a magnetic compass shows as north.
    
    Using this API ensures that you present the same offsets to users as
-   X-Plane's built-in instruments.                                            
+   X-Plane's built-in instruments.
 }
 
 
@@ -184,31 +204,34 @@ TYPE
     XPLMGetMagneticVariation
     
     Returns X-Plane's simulated magnetic variation (declination) at the
-    indication latitude and longitude.                                         
+    indication latitude and longitude.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPLMGetMagneticVariation(
-                                        latitude            : Real;    
-                                        longitude           : Real) : Single;    
+                                        latitude            : Real;
+                                        longitude           : Real) : Single;
     cdecl; external XPLM_DLL;
 
    {
     XPLMDegTrueToDegMagnetic
     
     Converts a heading in degrees relative to true north into a value relative
-    to magnetic north at the user's current location.                          
+    to magnetic north at the user's current location.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPLMDegTrueToDegMagnetic(
-                                        headingDegreesTrue  : Single) : Single;    
+                                        headingDegreesTrue  : Single) : Single;
     cdecl; external XPLM_DLL;
 
    {
     XPLMDegMagneticToDegTrue
     
     Converts a heading in degrees relative to magnetic north at the user's
-    current location into a value relative to true north.                      
+    current location into a value relative to true north.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPLMDegMagneticToDegTrue(
-                                        headingDegreesMagnetic: Single) : Single;    
+                                        headingDegreesMagnetic: Single) : Single;
     cdecl; external XPLM_DLL;
 
 {$ENDIF XPLM300}
@@ -219,7 +242,7 @@ TYPE
    The object drawing routines let you load and draw X-Plane OBJ files.
    Objects are loaded by file path and managed via an opaque handle. X-Plane
    naturally reference counts objects, so it is important that you balance
-   every successful call to XPLMLoadObject with a call to XPLMUnloadObject!   
+   every successful call to XPLMLoadObject with a call to XPLMUnloadObject!
 }
 
 
@@ -229,7 +252,7 @@ TYPE
     XPLMObjectRef
     
     An XPLMObjectRef is a opaque handle to an .obj file that has been loaded
-    into memory.                                                               
+    into memory.
    }
    XPLMObjectRef = pointer;
    PXPLMObjectRef = ^XPLMObjectRef;
@@ -241,7 +264,7 @@ TYPE
     
     The XPLMDrawInfo_t structure contains positioning info for one object that
     is to be drawn. Be sure to set structSize to the size of the structure for
-    future expansion.                                                          
+    future expansion.
    }
    XPLMDrawInfo_t = RECORD
      { Set this to the size of this structure!                                    }
@@ -262,6 +285,34 @@ TYPE
    PXPLMDrawInfo_t = ^XPLMDrawInfo_t;
 {$ENDIF XPLM200}
 
+{$IFDEF XPLM420}
+   {
+    XPLMDrawInfoDouble_t
+    
+    The XPLMDrawInfo_t structure contains positioning info for one object that
+    is to be drawn. Be sure to set structSize to the size of the structure for
+    future expansion.
+   }
+TYPE
+   XPLMDrawInfoDouble_t = RECORD
+     { Set this to the size of this structure!                                    }
+     structSize               : Integer;
+     { X location of the object in local coordinates.                             }
+     x                        : Real;
+     { Y location of the object in local coordinates.                             }
+     y                        : Real;
+     { Z location of the object in local coordinates.                             }
+     z                        : Real;
+     { Pitch in degres to rotate the object, positive is up.                      }
+     pitch                    : Real;
+     { Heading in local coordinates to rotate the object, clockwise.              }
+     heading                  : Real;
+     { Roll to rotate the object.                                                 }
+     roll                     : Real;
+   END;
+   PXPLMDrawInfoDouble_t = ^XPLMDrawInfoDouble_t;
+{$ENDIF XPLM420}
+
 {$IFDEF XPLM210}
    {
     XPLMObjectLoaded_f
@@ -269,16 +320,16 @@ TYPE
     You provide this callback when loading an object asynchronously; it will be
     called once the object is loaded. Your refcon is passed back. The object
     ref passed in is the newly loaded object (ready for use) or NULL if an
-    error occured.
+    error occured. It will not be called more than once per object.
     
     If your plugin is disabled, this callback will be delivered as soon as the
     plugin is re-enabled. If your plugin is unloaded before this callback is
-    ever called, the SDK will release the object handle for you.               
+    ever called, the SDK will release the object handle for you.
    }
 TYPE
      XPLMObjectLoaded_f = PROCEDURE(
-                                    inObject            : XPLMObjectRef;    
-                                    inRefcon            : pointer); cdecl;   
+                                    inObject            : XPLMObjectRef;
+                                    inRefcon            : pointer); cdecl;    { Can be nil }
 {$ENDIF XPLM210}
 
 {$IFDEF XPLM200}
@@ -301,11 +352,12 @@ TYPE
     load any object that can be used in the X-Plane scenery system.
     
     It is important that the datarefs an object uses for animation already be
-    loaded before you load the object. For this reason it may be necessary to
-    defer object loading until the sim has fully started.                      
+    registered before you load the object. For this reason it may be necessary
+    to defer object loading until the sim has fully started.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPLMLoadObject(
-                                        inPath              : XPLMString) : XPLMObjectRef;    
+                                        inPath              : XPLMString) : XPLMObjectRef;
     cdecl; external XPLM_DLL;
 {$ENDIF XPLM200}
 
@@ -324,12 +376,13 @@ TYPE
     
     There is no way to cancel an asynchronous object load; you must wait for
     the load to complete and then release the object if it is no longer
-    desired.                                                                   
+    desired.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPLMLoadObjectAsync(
-                                        inPath              : XPLMString;    
-                                        inCallback          : XPLMObjectLoaded_f;    
-                                        inRefcon            : pointer);    
+                                        inPath              : XPLMString;
+                                        inCallback          : XPLMObjectLoaded_f;
+                                        inRefcon            : pointer);    { Can be nil }
     cdecl; external XPLM_DLL;
 {$ENDIF XPLM210}
 
@@ -347,24 +400,26 @@ TYPE
     X-Plane will attempt to cull the objects based on LOD and visibility, and
     will pick the appropriate LOD.
     
-    Lighting is a boolean; pass 1 to show the night version of object with
-    night-only lights lit up. Pass 0 to show the daytime version of the object.
+    Lighting is a boolean; pass true to show the night version of object with
+    night-only lights lit up. Pass false to show the daytime version of the
+    object.
     
-    earth_relative controls the coordinate system. If this is 1, the rotations
-    you specify are applied to the object after its coordinate system is
-    transformed from local to earth-relative coordinates -- that is, an object
-    with no rotations will point toward true north and the Y axis will be up
-    against gravity. If this is 0, the object is drawn with your rotations from
-    local coordanates -- that is, an object with no rotations is drawn pointing
-    down the -Z axis and the Y axis of the object matches the local coordinate
-    Y axis.                                                                    
+    earth_relative controls the coordinate system. If this is true, the
+    rotations you specify are applied to the object after its coordinate system
+    is transformed from local to earth-relative coordinates -- that is, an
+    object with no rotations will point toward true north and the Y axis will
+    be up against gravity. If this is false, the object is drawn with your
+    rotations from local coordanates -- that is, an object with no rotations is
+    drawn pointing down the -Z axis and the Y axis of the object matches the
+    local coordinate Y axis.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPLMDrawObjects(
-                                        inObject            : XPLMObjectRef;    
-                                        inCount             : Integer;    
-                                        inLocations         : PXPLMDrawInfo_t;    
-                                        lighting            : Integer;    
-                                        earth_relative      : Integer);    
+                                        inObject            : XPLMObjectRef;
+                                        inCount             : Integer;
+                                        inLocations         : PXPLMDrawInfo_t;
+                                        lighting            : Integer;
+                                        earth_relative      : Integer);
     cdecl; external XPLM_DLL;
 {$ENDIF XPLM_DEPRECATED}
 
@@ -375,10 +430,11 @@ TYPE
     This routine marks an object as no longer being used by your plugin.
     Objects are reference counted: once no plugins are using an object, it is
     purged from memory. Make sure to call XPLMUnloadObject once for each
-    successful call to XPLMLoadObject.                                         
+    successful call to XPLMLoadObject.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    PROCEDURE XPLMUnloadObject(
-                                        inObject            : XPLMObjectRef);    
+                                        inObject            : XPLMObjectRef);
     cdecl; external XPLM_DLL;
 {$ENDIF XPLM200}
 
@@ -390,7 +446,7 @@ TYPE
    The library access routines allow you to locate scenery objects via the
    X-Plane library system. Right now library access is only provided for
    objects, allowing plugin-drawn objects to be extended using the library
-   system.                                                                    
+   system.
 }
 
 
@@ -399,12 +455,12 @@ TYPE
     
     An XPLMLibraryEnumerator_f is a callback you provide that is called once
     for each library element that is located. The returned paths will be
-    relative to the X-System folder.                                           
+    relative to the X-System folder.
    }
 TYPE
      XPLMLibraryEnumerator_f = PROCEDURE(
-                                    inFilePath          : XPLMString;    
-                                    inRef               : pointer); cdecl;   
+                                    inFilePath          : XPLMString;
+                                    inRef               : pointer); cdecl;    { Can be nil }
 
    {
     XPLMLookupObjects
@@ -417,17 +473,40 @@ TYPE
     The latitude and longitude parameters specify the location the object will
     be used. The library system allows for scenery packages to only provide
     objects to certain local locations. Only objects that are allowed at the
-    latitude/longitude you provide will be returned.                           
+    latitude/longitude you provide will be returned.
+    
+    The enumerator is fully synchronous: it is called once per matching object,
+    and all calls complete before XPLMLookupObjects returns.
    }
+    { NOT thread-safe. Use ONLY from the main thread, in callbacks.                 }
    FUNCTION XPLMLookupObjects(
-                                        inPath              : XPLMString;    
-                                        inLatitude          : Single;    
-                                        inLongitude         : Single;    
-                                        enumerator          : XPLMLibraryEnumerator_f;    
-                                        ref                 : pointer) : Integer;    
+                                        inPath              : XPLMString;
+                                        inLatitude          : Single;
+                                        inLongitude         : Single;
+                                        enumerator          : XPLMLibraryEnumerator_f;
+                                        ref                 : pointer) : Integer;    { Can be nil }
     cdecl; external XPLM_DLL;
 
 {$ENDIF XPLM200}
+{___________________________________________________________________________
+ * Host API's
+ ___________________________________________________________________________}
+
+CONST
+   XPLMSceneryHostApiVersion = 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 IMPLEMENTATION
 
