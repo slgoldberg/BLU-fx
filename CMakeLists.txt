@@ -142,7 +142,8 @@ endif ()
 # Link OS X core system libraries.
 if (APPLE)
     find_library(CORE_FOUNDATION_LIBRARY CoreFoundation)
-    target_link_libraries(blu_fx ${CORE_FOUNDATION_LIBRARY})
+    find_library(APPLICATION_SERVICES_LIBRARY ApplicationServices)
+    target_link_libraries(blu_fx ${CORE_FOUNDATION_LIBRARY} ${APPLICATION_SERVICES_LIBRARY})
 endif ()
 
 if (WIN32)

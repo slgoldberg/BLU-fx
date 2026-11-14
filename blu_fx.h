@@ -21,6 +21,8 @@
 #ifndef BLU_FX_H
 #define BLU_FX_H
 
+#include <string>
+
 // Define plugin name & version macros
 #define NAME "BLU-fx"
 #define NAME_BLANK "      "           /* to align multi-line log entries :-) */
@@ -33,7 +35,7 @@
 #define NAME_VERSION NAME " v" VERSION
 #define NAME_VERSION_BLANK NAME "  " VERSION_BLANK "  "
 
-// Define config file path
+// Define legacy config file path (for first-run migration)
 #if IBM
 #define CONFIG_PATH ".\\Resources\\plugins\\" NAME_LOWERCASE "\\" NAME_LOWERCASE ".ini"
 #else
@@ -42,6 +44,18 @@
 
 // User-facing display path without leading "./" or ".\\" prefix
 #define CONFIG_PATH_DISPLAY "Resources/plugins/" NAME_LOWERCASE "/" NAME_LOWERCASE ".ini"
+
+// Define user profiles directory path
+#if IBM
+#define PROFILES_PATH ".\\Resources\\plugins\\" NAME_LOWERCASE "\\profiles"
+#else
+#define PROFILES_PATH "./Resources/plugins/" NAME_LOWERCASE "/profiles"
+#endif
+
+#define PROFILES_PATH_DISPLAY "Resources/plugins/" NAME_LOWERCASE "/profiles"
+// Backward compatibility aliases:
+#define PRESETS_PATH PROFILES_PATH
+#define PRESETS_PATH_DISPLAY PROFILES_PATH_DISPLAY
 
 #define DEFAULT_POST_PROCESSING_ENABLED 1
 #define DEFAULT_FPS_LIMITER_ENABLED 0
@@ -141,7 +155,25 @@ void SetPostProcessingEnabled(bool enabled);
 void SetFpsLimiterEnabled(bool enabled);
 void SetControlCinemaVeriteEnabled(bool enabled);
 void UpdateRaleighScale(int reset);
+void UpdateDiskSnapshot(void);
 void SaveSettings(void);
 void LoadSettings(void);
+bool SaveSettingsToFile(const std::string& path);
+bool LoadSettingsFromFile(const std::string& path);
+void EnsureProfilesDirectoryExists(void);
+void EnsurePresetsDirectoryExists(void); // alias
+
+// Application Preferences (Output/preferences/blu_fx.prf):
+extern std::string sActiveProfileName;
+extern std::string sStartupActiveProfile;
+extern std::string sSessionInitialProfile;
+extern std::string sUiMode;
+extern float sUiOpacity;
+extern int sConfirmOnClose;
+
+std::string GetPrefsFilePath(void);
+bool LoadPreferences(void);
+bool SavePreferences(void);
+void MigrateLegacyConfigIfNeeded(void);
 
 #endif // BLU_FX_H

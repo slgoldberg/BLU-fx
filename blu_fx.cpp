@@ -37,7 +37,18 @@
 
 #include <fstream>
 #include <sstream>
+#include <iomanip>
 #include <memory>
+#include <string>
+
+#if IBM
+#include <direct.h>
+#define BLUFX_MKDIR(d) _mkdir(d)
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#define BLUFX_MKDIR(d) mkdir(d, 0755)
+#endif
 
 #if !IBM
 #include <string.h>
@@ -859,7 +870,7 @@ void SetControlCinemaVeriteEnabled(bool enabled)
 static BLUfxPreset sDiskPreset;
 static bool sHasDiskSnapshot = false;
 
-static void UpdateDiskSnapshot()
+void UpdateDiskSnapshot(void)
 {
     sDiskPreset.brightness = brightness;
     sDiskPreset.contrast = contrast;
@@ -978,43 +989,221 @@ void ClearPrePresetScratchpad(void)
     sHasPrePreset = false;
 }
 
-// saves current settings to the config file
-void SaveSettings(void)
+std::string sActiveProfileName = "blu_fx.ini";
+std::string sStartupActiveProfile = "blu_fx.ini";
+std::string sSessionInitialProfile = "blu_fx.ini";
+std::string sUiMode = "sliders";
+float sUiOpacity = 0.95f;
+int sConfirmOnClose = 1; // 1 = prompt with confirmation dialog when closing with unsaved adjustments; 0 = silently keep in-memory
+
+void EnsureProfilesDirectoryExists(void)
 {
-    std::fstream file;
-    file.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
-
-    if(file.is_open())
-    {
-        file << "postProcesssingEnabled=" << postProcesssingEnabled << std::endl;
-        file << "fpsLimiterEnabled=" << fpsLimiterEnabled << std::endl;
-        file << "controlCinemaVeriteEnabled=" << controlCinemaVeriteEnabled << std::endl;
-        file << "brightness=" << brightness << std::endl;
-        file << "contrast=" << contrast << std::endl;
-        file << "saturation=" << saturation << std::endl;
-        file << "redScale=" << redScale << std::endl;
-        file << "greenScale=" << greenScale << std::endl;
-        file << "blueScale=" << blueScale << std::endl;
-        file << "redOffset=" << redOffset << std::endl;
-        file << "greenOffset=" << greenOffset << std::endl;
-        file << "blueOffset=" << blueOffset << std::endl;
-        file << "vignette=" << vignette << std::endl;
-        file << "raleighScale=" << raleighScale << std::endl;
-        file << "maxFps=" << maxFps << std::endl;
-        file << "disableCinemaVeriteTime=" << disableCinemaVeriteTime << std::endl;
-
-        file.close();
-        UpdateDiskSnapshot();
+    struct stat st;
+    if (stat(PROFILES_PATH, &st) != 0) {
+        BLUFX_MKDIR(PROFILES_PATH);
     }
 }
 
-// loads settings from the config file
-void LoadSettings(void)
+void EnsurePresetsDirectoryExists(void)
+{
+    EnsureProfilesDirectoryExists();
+}
+
+std::string GetPrefsFilePath(void)
+{
+    char buf[512] = {0};
+    XPLMGetPrefsPath(buf);
+    XPLMExtractFileAndPath(buf);
+    std::string path = buf;
+    char sep = *XPLMGetDirectorySeparator();
+    if (!path.empty() && path.back() != '/' && path.back() != '\\') {
+        path += sep;
+    }
+    path += "blu_fx.prf";
+    return path;
+}
+
+bool SavePreferences(void)
+{
+    std::string path = GetPrefsFilePath();
+    std::fstream file;
+    file.open(path.c_str(), std::ios_base::out | std::ios_base::trunc);
+    if (!file.is_open()) return false;
+
+    file << "# Blu-FX Application Preferences" << std::endl;
+    file << "startupProfile=" << sStartupActiveProfile << std::endl;
+    file << "activeProfile=" << sStartupActiveProfile << std::endl;
+    file << "postProcessingEnabled=" << postProcesssingEnabled << std::endl;
+    file << "uiMode=" << sUiMode << std::endl;
+    file << "uiOpacity=" << std::fixed << std::setprecision(2) << sUiOpacity << std::endl;
+    file << "confirmOnClose=" << sConfirmOnClose << std::endl;
+    int effectiveMaxFps = (fpsLimiterEnabled && maxFps > 0.0f) ? (int)maxFps : 0;
+    file << "maxFps=" << effectiveMaxFps << std::endl;
+    file << std::endl;
+    file << "# Legacy Camera Settings (X-Plane 11)" << std::endl;
+    file << "cinemaVeriteEnabled=" << controlCinemaVeriteEnabled << std::endl;
+    file << "cinemaVeriteDisableTime=" << std::fixed << std::setprecision(1) << disableCinemaVeriteTime << std::endl;
+
+    file.close();
+    return true;
+}
+
+bool LoadPreferences(void)
+{
+    std::string path = GetPrefsFilePath();
+    std::ifstream file;
+    file.open(path.c_str());
+    if (!file.is_open()) return false;
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#' || line[0] == ';') continue;
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+
+        std::string key = line.substr(0, eq);
+        std::string val = line.substr(eq + 1);
+
+        while (!key.empty() && (key.back() == ' ' || key.back() == '\t' || key.back() == '\r')) key.pop_back();
+        while (!val.empty() && (val.front() == ' ' || val.front() == '\t')) val.erase(0, 1);
+        while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\r')) val.pop_back();
+
+        std::istringstream iss(val);
+        if (key == "startupProfile") {
+            sStartupActiveProfile = val;
+            sActiveProfileName = val;
+        } else if (key == "activeProfile") {
+            if (sStartupActiveProfile.empty() || sStartupActiveProfile == "blu_fx.ini") {
+                sStartupActiveProfile = val;
+                sActiveProfileName = val;
+            }
+        } else if (key == "postProcessingEnabled" || key == "postProcesssingEnabled") {
+            iss >> postProcesssingEnabled;
+        } else if (key == "uiMode") {
+            sUiMode = val;
+        } else if (key == "uiOpacity") {
+            iss >> sUiOpacity;
+            if (sUiOpacity < 0.20f) sUiOpacity = 0.20f;
+            if (sUiOpacity > 1.00f) sUiOpacity = 1.00f;
+        } else if (key == "confirmOnClose") {
+            iss >> sConfirmOnClose;
+        } else if (key == "maxFps") {
+            int fps = 0;
+            iss >> fps;
+            if (fps > 0) {
+                fpsLimiterEnabled = 1;
+                maxFps = (float)fps;
+            } else {
+                fpsLimiterEnabled = 0;
+            }
+        } else if (key == "cinemaVeriteEnabled") {
+            iss >> controlCinemaVeriteEnabled;
+        } else if (key == "cinemaVeriteDisableTime") {
+            iss >> disableCinemaVeriteTime;
+        }
+    }
+    file.close();
+    return true;
+}
+
+void MigrateLegacyConfigIfNeeded(void)
+{
+    EnsureProfilesDirectoryExists();
+
+    std::string prefsPath = GetPrefsFilePath();
+    struct stat st;
+    bool hasPrefs = (stat(prefsPath.c_str(), &st) == 0);
+    bool hasLegacyIni = (stat(CONFIG_PATH, &st) == 0);
+
+    if (!hasPrefs) {
+        // First run of v2.0!
+        if (hasLegacyIni) {
+            // Read legacy values first to capture maxFps, cinemaVerite, and color values:
+            LoadSettingsFromFile(CONFIG_PATH);
+
+            // Move legacy file into profiles/:
+            std::string destProfile = std::string(PROFILES_PATH) + "/blu_fx.ini";
+            if (stat(destProfile.c_str(), &st) == 0) {
+                // Collision guard: if blu_fx.ini already exists in profiles, backup:
+                destProfile = std::string(PROFILES_PATH) + "/blu_fx_backup.ini";
+                sActiveProfileName = "blu_fx_backup.ini";
+            } else {
+                sActiveProfileName = "blu_fx.ini";
+            }
+
+            if (std::rename(CONFIG_PATH, destProfile.c_str()) != 0) {
+                SaveSettingsToFile(destProfile);
+                std::remove(CONFIG_PATH);
+            }
+
+            SavePreferences();
+            XPLMDebugString("Blu-FX: Migrated legacy blu_fx.ini to profiles/ and created Output/preferences/blu_fx.prf\n");
+        } else {
+            // Fresh install with no legacy file:
+            sActiveProfileName = "blu_fx.ini";
+            std::string destProfile = std::string(PROFILES_PATH) + "/blu_fx.ini";
+            if (stat(destProfile.c_str(), &st) != 0) {
+                SaveSettingsToFile(destProfile);
+            }
+            SavePreferences();
+            XPLMDebugString("Blu-FX: Created default Output/preferences/blu_fx.prf\n");
+        }
+    } else {
+        // Preferences file already exists.
+        // Check for manual "muscle memory" drop into root folder:
+        if (hasLegacyIni) {
+            std::string destProfile = std::string(PROFILES_PATH) + "/blu_fx.ini";
+            if (stat(destProfile.c_str(), &st) == 0) {
+                destProfile = std::string(PROFILES_PATH) + "/blu_fx_imported.ini";
+                sActiveProfileName = "blu_fx_imported.ini";
+            } else {
+                sActiveProfileName = "blu_fx.ini";
+            }
+
+            if (std::rename(CONFIG_PATH, destProfile.c_str()) != 0) {
+                SaveSettingsToFile(destProfile);
+                std::remove(CONFIG_PATH);
+            }
+            SavePreferences();
+            XPLMDebugString("Blu-FX: Adopted root blu_fx.ini into profiles/\n");
+        }
+    }
+}
+
+// saves current color grading adjustments to a specified profile file
+bool SaveSettingsToFile(const std::string& path)
+{
+    EnsureProfilesDirectoryExists();
+    std::fstream file;
+    file.open(path.c_str(), std::ios_base::out | std::ios_base::trunc);
+
+    if (file.is_open())
+    {
+        file << "brightness=" << std::fixed << std::setprecision(2) << brightness << std::endl;
+        file << "contrast=" << std::fixed << std::setprecision(2) << contrast << std::endl;
+        file << "saturation=" << std::fixed << std::setprecision(2) << saturation << std::endl;
+        file << "redScale=" << std::fixed << std::setprecision(2) << redScale << std::endl;
+        file << "greenScale=" << std::fixed << std::setprecision(2) << greenScale << std::endl;
+        file << "blueScale=" << std::fixed << std::setprecision(2) << blueScale << std::endl;
+        file << "redOffset=" << std::fixed << std::setprecision(2) << redOffset << std::endl;
+        file << "greenOffset=" << std::fixed << std::setprecision(2) << greenOffset << std::endl;
+        file << "blueOffset=" << std::fixed << std::setprecision(2) << blueOffset << std::endl;
+        file << "vignette=" << std::fixed << std::setprecision(2) << vignette << std::endl;
+        file << "raleighScale=" << std::fixed << std::setprecision(1) << raleighScale << std::endl;
+
+        file.close();
+        return true;
+    }
+    return false;
+}
+
+// loads color grading adjustments from a specified file (profile or legacy)
+bool LoadSettingsFromFile(const std::string& path)
 {
     ClearPrePresetScratchpad();
 
     std::ifstream file;
-    file.open(CONFIG_PATH);
+    file.open(path.c_str());
 
     if(file.is_open())
     {
@@ -1022,67 +1211,136 @@ void LoadSettings(void)
 
         while(getline(file, line))
         {
-            std::string val = line.substr(line.find("=") + 1);
+            if (line.empty() || line[0] == '#' || line[0] == ';') continue;
+            size_t eq = line.find('=');
+            if (eq == std::string::npos) continue;
+
+            std::string key = line.substr(0, eq);
+            std::string val = line.substr(eq + 1);
+
+            while (!key.empty() && (key.back() == ' ' || key.back() == '\t' || key.back() == '\r')) key.pop_back();
+            while (!val.empty() && (val.front() == ' ' || val.front() == '\t')) val.erase(0, 1);
+            while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\r')) val.pop_back();
+
             std::istringstream iss(val);
 
-            if(line.find("postProcesssingEnabled") != std::string::npos)
-                iss >> postProcesssingEnabled;
-            else if(line.find("fpsLimiterEnabled") != std::string::npos)
-                iss >> fpsLimiterEnabled;
-            else if(line.find("controlCinemaVeriteEnabled") != std::string::npos)
-                iss >> controlCinemaVeriteEnabled;
-            else if(line.find("brightness") != std::string::npos)
+            if(key == "brightness")
                 iss >> brightness;
-            else if(line.find("contrast") != std::string::npos)
+            else if(key == "contrast")
                 iss >> contrast;
-            else if(line.find("saturation") != std::string::npos)
+            else if(key == "saturation")
                 iss >> saturation;
-            else if(line.find("redScale") != std::string::npos)
+            else if(key == "redScale")
                 iss >> redScale;
-            else if(line.find("greenScale") != std::string::npos)
+            else if(key == "greenScale")
                 iss >> greenScale;
-            else if(line.find("blueScale") != std::string::npos)
+            else if(key == "blueScale")
                 iss >> blueScale;
-            else if(line.find("redOffset") != std::string::npos)
+            else if(key == "redOffset")
                 iss >> redOffset;
-            else if(line.find("greenOffset") != std::string::npos)
+            else if(key == "greenOffset")
                 iss >> greenOffset;
-            else if(line.find("blueOffset") != std::string::npos)
+            else if(key == "blueOffset")
                 iss >> blueOffset;
-            else if(line.find("vignette") != std::string::npos)
+            else if(key == "vignette")
                 iss >> vignette;
-            else if(line.find("raleighScale") != std::string::npos)
+            else if(key == "raleighScale")
                 iss >> raleighScale;
-            else if(line.find("maxFps") != std::string::npos)
+            else if(key == "postProcesssingEnabled" || key == "postProcessingEnabled")
+                iss >> postProcesssingEnabled;
+            else if(key == "fpsLimiterEnabled")
+                iss >> fpsLimiterEnabled;
+            else if(key == "controlCinemaVeriteEnabled" || key == "cinemaVeriteEnabled")
+                iss >> controlCinemaVeriteEnabled;
+            else if(key == "maxFps")
                 iss >> maxFps;
-            else if(line.find("disableCinemaVeriteTime") != std::string::npos)
+            else if(key == "disableCinemaVeriteTime" || key == "cinemaVeriteDisableTime")
                 iss >> disableCinemaVeriteTime;
         }
 
         file.close();
-        UpdateDiskSnapshot();
-        
-        // saves the initial configuration throughout the session
-        static bool sIsFirstLoad = true;
-        if (sIsFirstLoad) {
-            sIsFirstLoad = false;
-            
-            // copies to User preset attached to Restore button
-            BLUfxPresets[PRESET_USER].brightness = brightness;
-            BLUfxPresets[PRESET_USER].contrast = contrast;
-            BLUfxPresets[PRESET_USER].saturation = saturation;
-            BLUfxPresets[PRESET_USER].redScale = redScale;
-            BLUfxPresets[PRESET_USER].greenScale = greenScale;
-            BLUfxPresets[PRESET_USER].blueScale = blueScale;
-            BLUfxPresets[PRESET_USER].redOffset = redOffset;
-            BLUfxPresets[PRESET_USER].greenOffset = greenOffset;
-            BLUfxPresets[PRESET_USER].blueOffset = blueOffset;
-            BLUfxPresets[PRESET_USER].vignette = vignette;
-            BLUfxPresets[PRESET_USER].raleighScale = raleighScale;
-            BLUfxPresets[PRESET_USER].maxFps = maxFps;
-            BLUfxPresets[PRESET_USER].disableCinemaVeriteTime = disableCinemaVeriteTime;
+        UpdateRaleighScale(0);
+        return true;
+    }
+    return false;
+}
+
+// saves current settings to active profile in profiles/ and updates blu_fx.prf
+void SaveSettings(void)
+{
+    if (!sActiveProfileName.empty() && sActiveProfileName.rfind("preset:", 0) != 0) {
+        std::string fullPath = std::string(PROFILES_PATH) + "/" + sActiveProfileName;
+        SaveSettingsToFile(fullPath);
+    }
+    SavePreferences();
+    UpdateDiskSnapshot();
+}
+
+// loads startup settings: migrates if needed, loads .prf, then loads active profile
+void LoadSettings(void)
+{
+    EnsureProfilesDirectoryExists();
+    MigrateLegacyConfigIfNeeded();
+    LoadPreferences();
+
+    bool loadedFromPreset = false;
+    if (sActiveProfileName.rfind("preset:", 0) == 0) {
+        std::string presetName = sActiveProfileName.substr(7);
+        for (int i = 0; i < PRESET_MAX; ++i) {
+            if (presetName == BLUfxPresetNames[i]) {
+                ApplyPreset(i);
+                loadedFromPreset = true;
+                break;
+            }
         }
     }
+
+    if (!loadedFromPreset) {
+        std::string profilePath;
+        if (!sActiveProfileName.empty()) {
+            profilePath = std::string(PROFILES_PATH) + "/" + sActiveProfileName;
+        }
+
+        struct stat st;
+        if (profilePath.empty() || stat(profilePath.c_str(), &st) != 0) {
+            // Fallback: look for blu_fx.ini in profiles:
+            profilePath = std::string(PROFILES_PATH) + "/blu_fx.ini";
+            if (stat(profilePath.c_str(), &st) == 0) {
+                sActiveProfileName = "blu_fx.ini";
+            } else {
+                ApplyPreset(PRESET_DEFAULT);
+                sActiveProfileName.clear();
+            }
+        }
+
+        if (!profilePath.empty() && stat(profilePath.c_str(), &st) == 0) {
+            LoadSettingsFromFile(profilePath);
+        }
+    }
+
+    // saves the initial configuration throughout the session
+    static bool sIsFirstLoad = true;
+    if (sIsFirstLoad) {
+        sIsFirstLoad = false;
+        sSessionInitialProfile = sActiveProfileName;
+
+        // copies to User preset attached to Restore button
+        BLUfxPresets[PRESET_USER].brightness = brightness;
+        BLUfxPresets[PRESET_USER].contrast = contrast;
+        BLUfxPresets[PRESET_USER].saturation = saturation;
+        BLUfxPresets[PRESET_USER].redScale = redScale;
+        BLUfxPresets[PRESET_USER].greenScale = greenScale;
+        BLUfxPresets[PRESET_USER].blueScale = blueScale;
+        BLUfxPresets[PRESET_USER].redOffset = redOffset;
+        BLUfxPresets[PRESET_USER].greenOffset = greenOffset;
+        BLUfxPresets[PRESET_USER].blueOffset = blueOffset;
+        BLUfxPresets[PRESET_USER].vignette = vignette;
+        BLUfxPresets[PRESET_USER].raleighScale = raleighScale;
+        BLUfxPresets[PRESET_USER].maxFps = maxFps;
+        BLUfxPresets[PRESET_USER].disableCinemaVeriteTime = disableCinemaVeriteTime;
+    }
+
+    UpdateDiskSnapshot();
 }
 
 static void ToggleSettingsWindow()
@@ -1188,6 +1446,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 #endif
 
     // obtain datarefs
+    EnsurePresetsDirectoryExists();
     if (!IS_XP12_1_4)
         cinemaVeriteDataRef = XPLMFindDataRef("sim/graphics/view/cinema_verite");
     

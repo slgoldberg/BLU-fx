@@ -35,6 +35,13 @@
 #define BLUFX_SIDE_BY_SIDE_LAYOUT 1
 #endif
 
+// Experimental: Rotary Knob/Dial UI for Post-Processing Adjustments
+// 1 = Rotary Dials grouped in visual triads (Tone, RGB Midtones, RGB Shadows, Optics)
+// 0 = Classic SliderWithReset layout (Default for v2.0 release)
+#ifndef BLUFX_EXPERIMENTAL_KNOB_UI
+#define BLUFX_EXPERIMENTAL_KNOB_UI 0
+#endif
+
 // Global ImGui font atlas initialization & teardown:
 bool InitializeImGui();
 void TeardownImGui();
@@ -44,8 +51,13 @@ public:
     static constexpr int DEFAULT_LEFT_OFFSET = 10;
     static constexpr int DEFAULT_TOP_OFFSET  = 35;
 #if BLUFX_SIDE_BY_SIDE_LAYOUT
+#if BLUFX_EXPERIMENTAL_KNOB_UI
+    static constexpr int DEFAULT_WIDTH       = 520;
+    static constexpr int DEFAULT_HEIGHT      = 525;
+#else
     static constexpr int DEFAULT_WIDTH       = 465;
     static constexpr int DEFAULT_HEIGHT      = 525;
+#endif
 #else
     static constexpr int DEFAULT_WIDTH       = 430;
     static constexpr int DEFAULT_HEIGHT      = 525;

@@ -391,9 +391,10 @@ SettingsImgWindow::SettingsImgWindow()
     io.IniFilename = nullptr;
     io.LogFilename = nullptr;
 
-    // Subtle translucent background so users can see the simulator scene behind the window:
+    // Apply modern ImGee Charcoal Slate cockpit theme:
     ImGuiStyle& style = ImGui::GetStyle();
-    style.Colors[ImGuiCol_WindowBg].w = 0.88f;
+    ImGui::ApplyDefaultTheme(&style);
+    style.Colors[ImGuiCol_WindowBg].w = sUiOpacity;
     style.FrameRounding = 3.0f;
     style.GrabRounding  = 3.0f;
 
@@ -416,7 +417,7 @@ SettingsImgWindow::~SettingsImgWindow()
 
 void SettingsImgWindow::RequestClose()
 {
-    if (HasUnsavedChanges()) {
+    if (sConfirmOnClose && HasUnsavedChanges()) {
         mShowCloseConfirmModal = true;
     } else {
         SetVisible(false);
@@ -513,8 +514,106 @@ void SettingsImgWindow::drawCustomTitleBar()
     ImGui::Separator();
 }
 
+// User profiles and file dialog state:
+static std::string s_SelectedPresetFilename;
+static int s_ActiveCuratedPresetIdx = -1;
+static bool s_SaveModalOpen = false;
+static std::string s_SavedFilePath;
+static std::string s_DefaultSaveName;
+static bool s_OpenModalOpen = false;
+static std::string s_OpenFilePath;
+static bool s_CloseAfterSaveAs = false;
+static bool s_SetAsStartupAfterSave = false;
+static std::string s_PrePresetFilename;
+static int s_PrePresetActiveCuratedIdx = -1;
+
+static void SyncUIStateWithActiveProfile()
+{
+    if (sActiveProfileName.rfind("preset:", 0) == 0) {
+        s_SelectedPresetFilename.clear();
+        std::string pName = sActiveProfileName.substr(7);
+        s_ActiveCuratedPresetIdx = -1;
+        for (int i = PRESET_POLAROID; i < PRESET_MAX; ++i) {
+            if (pName == BLUfxPresetNames[i]) {
+                s_ActiveCuratedPresetIdx = i;
+                break;
+            }
+        }
+    } else {
+        s_SelectedPresetFilename = sActiveProfileName;
+        s_ActiveCuratedPresetIdx = -1;
+    }
+    ClearPrePresetScratchpad();
+}
+
+static void RestoreSessionStartup()
+{
+    ApplyPreset(PRESET_USER);
+    sActiveProfileName = sSessionInitialProfile;
+    SyncUIStateWithActiveProfile();
+    UpdateDiskSnapshot();
+}
+
+static std::string GetSmartPresetDefaultFilename(int activeCuratedIdx, const std::string& currentPresetFile)
+{
+    std::string baseName;
+    if (activeCuratedIdx >= PRESET_POLAROID && activeCuratedIdx < PRESET_MAX) {
+        baseName = BLUfxPresetNames[activeCuratedIdx];
+        const BLUfxPreset& cur = BLUfxPresets[activeCuratedIdx];
+        bool tweaked = (std::abs(brightness - cur.brightness) > 0.001f ||
+                        std::abs(contrast - cur.contrast) > 0.001f ||
+                        std::abs(saturation - cur.saturation) > 0.001f ||
+                        std::abs(redScale - cur.redScale) > 0.001f ||
+                        std::abs(greenScale - cur.greenScale) > 0.001f ||
+                        std::abs(blueScale - cur.blueScale) > 0.001f ||
+                        std::abs(redOffset - cur.redOffset) > 0.001f ||
+                        std::abs(greenOffset - cur.greenOffset) > 0.001f ||
+                        std::abs(blueOffset - cur.blueOffset) > 0.001f ||
+                        std::abs(vignette - cur.vignette) > 0.001f);
+        if (tweaked) {
+            baseName += "-custom";
+        }
+    } else if (!currentPresetFile.empty()) {
+        baseName = currentPresetFile;
+        size_t slash = baseName.find_last_of("/\\");
+        if (slash != std::string::npos) baseName = baseName.substr(slash + 1);
+        if (baseName.size() > 4 && baseName.substr(baseName.size() - 4) == ".ini") {
+            baseName = baseName.substr(0, baseName.size() - 4);
+        }
+    } else {
+        baseName = "CustomPreset";
+    }
+
+    EnsureProfilesDirectoryExists();
+    std::string candidate = baseName + ".ini";
+    std::string fullPath = std::string(PROFILES_PATH) + "/" + candidate;
+
+    if (!ImGui::Detail::FileExists(fullPath)) {
+        return candidate;
+    }
+
+    for (int i = 2; i <= 99; ++i) {
+        std::string cand_i = baseName + "-" + std::to_string(i) + ".ini";
+        std::string full_i = std::string(PROFILES_PATH) + "/" + cand_i;
+        if (!ImGui::Detail::FileExists(full_i)) {
+            return cand_i;
+        }
+    }
+    return candidate;
+}
+
 void SettingsImgWindow::buildInterface()
 {
+    // Auto-select active startup profile on first display:
+    static bool s_InitializedActiveProfile = false;
+    if (!s_InitializedActiveProfile && !sActiveProfileName.empty()) {
+        s_InitializedActiveProfile = true;
+        SyncUIStateWithActiveProfile();
+    }
+
+    // Keep window background opacity aligned with preferences:
+    ImGui::GetStyle().Colors[ImGuiCol_WindowBg].w = sUiOpacity;
+
     // Hook ImGui error logging so any recoverable error or assert prints to Log.txt:
     ImGuiContext* ctx = ImGui::GetCurrentContext();
     if (ctx && !ctx->ErrorCallback) {
@@ -550,7 +649,7 @@ void SettingsImgWindow::buildInterface()
         "**" NAME " v" VERSION " (64-bit)**\n"
         "* **Original Author:** Matteo Hausner\n"
         "* **64-bit Port & Modernization:** Steve Goldberg (`@slgoldberg`)\n"
-        "* **UI Engine:** `ImgWindow v2` + `contrib/`\n"
+        "* **UI Engine:** `ImgWindow v2` + `ImGee UX`\n"
         "\n*(Click to toggle this info card)*"
     );
 
@@ -569,6 +668,28 @@ void SettingsImgWindow::buildInterface()
 
     const BLUfxPreset& def = BLUfxPresets[PRESET_DEFAULT];
 
+    // Check if sliders match any factory preset exactly (only if not in a user profile):
+    int exactCuratedPresetIdx = -1;
+    for (int i = PRESET_POLAROID; i < PRESET_MAX; ++i) {
+        if (isActivePreset(&BLUfxPresets[i])) {
+            exactCuratedPresetIdx = i;
+            break;
+        }
+    }
+    if (s_SelectedPresetFilename.empty()) {
+        if (exactCuratedPresetIdx != -1 && s_ActiveCuratedPresetIdx != exactCuratedPresetIdx) {
+            s_ActiveCuratedPresetIdx = exactCuratedPresetIdx;
+        }
+    }
+
+    bool isCleanCuratedPreset = false;
+    std::string currentPresetRef;
+    if (s_ActiveCuratedPresetIdx >= PRESET_POLAROID && s_ActiveCuratedPresetIdx < PRESET_MAX &&
+        isActivePreset(&BLUfxPresets[s_ActiveCuratedPresetIdx])) {
+        isCleanCuratedPreset = true;
+        currentPresetRef = "preset:" + std::string(BLUfxPresetNames[s_ActiveCuratedPresetIdx]);
+    }
+
 #if BLUFX_SIDE_BY_SIDE_LAYOUT
     // ========================================================================
     // Option B: Sliders on left (widened), action buttons flush-right (split pairs)
@@ -576,7 +697,92 @@ void SettingsImgWindow::buildInterface()
     const float rightColWidth = 125.0f;
     const float leftColWidth  = ImGui::GetContentRegionAvail().x - rightColWidth - 16.0f;
 
-    ImGui::BeginGroup(); // Left column: Post-processing sliders
+    ImGui::BeginGroup(); // Left column: Post-processing adjustments
+    const float topSliderY = ImGui::GetCursorPosY();
+
+#if BLUFX_EXPERIMENTAL_KNOB_UI
+    // ------------------------------------------------------------------------
+    // Experimental Rotary Dials: Grouped into Triads (Tone, RGB Scale, RGB Offset)
+    // ------------------------------------------------------------------------
+    constexpr float kKnobRadius = 11.0f; // Compact diameter 22px
+    constexpr ImGuiKnobFlags kDialFlags = ImGuiKnobFlags_ShowTicks;
+
+    auto DrawDialCell = [&](const char* label, float* p_val, float def_val, float v_min, float v_max, const char* tooltip, const ImVec4* tint_col = nullptr) {
+        ImGui::TextUnformatted(label);
+        if (tint_col) {
+            ImGui::PushStyleColor(ImGuiCol_SliderGrab, *tint_col);
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(tint_col->x * 1.15f, tint_col->y * 1.15f, tint_col->z * 1.15f, 1.0f));
+        }
+        std::string knob_id = std::string("##dial_") + label;
+        ImGui::KnobWithReset(knob_id.c_str(), p_val, def_val, v_min, v_max, "%.2f", kKnobRadius, 0.01f, nullptr, kDialFlags);
+        if (tint_col) {
+            ImGui::PopStyleColor(2);
+        }
+        if (tooltip && tooltip[0]) {
+            ImGui::TimedTooltip::TextMD(tooltip);
+        }
+    };
+
+    const ImVec4 redTint(0.92f, 0.32f, 0.32f, 1.0f);
+    const ImVec4 greenTint(0.32f, 0.85f, 0.40f, 1.0f);
+    const ImVec4 blueTint(0.35f, 0.65f, 0.98f, 1.0f);
+
+    // Triad 1: Tone & Dynamics (Brightness, Contrast, Saturation)
+    if (ImGui::BeginTable("##triad_tone", 3, ImGuiTableFlags_SizingStretchSame, ImVec2(leftColWidth, 0.0f))) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        DrawDialCell("Brightness", &brightness, def.brightness, -0.50f, 0.50f, "Adjusts overall scene luminance offset (`-0.50` to `+0.50`).");
+
+        ImGui::TableSetColumnIndex(1);
+        DrawDialCell("Contrast", &contrast, def.contrast, 0.05f, 2.00f, "Adjusts dynamic range separation (`0.05` to `2.00`, default `1.00`).");
+
+        ImGui::TableSetColumnIndex(2);
+        DrawDialCell("Saturation", &saturation, def.saturation, 0.00f, 2.50f, "Adjusts color intensity (`0.00` = mono, `1.00` = normal, up to `2.50`).");
+        ImGui::EndTable();
+    }
+
+    ImGui::Spacing();
+
+    // Triad 2: RGB Scale (Mid-tones)
+    if (ImGui::BeginTable("##triad_rgb_scale", 3, ImGuiTableFlags_SizingStretchSame, ImVec2(leftColWidth, 0.0f))) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        DrawDialCell("Red Scale", &redScale, def.redScale, -0.75f, 0.75f, "Non-linear mid-tone curve boost/cut for **Red** (`-0.75` to `+0.75`).", &redTint);
+
+        ImGui::TableSetColumnIndex(1);
+        DrawDialCell("Green Scale", &greenScale, def.greenScale, -0.75f, 0.75f, "Non-linear mid-tone curve boost/cut for **Green** (`-0.75` to `+0.75`).", &greenTint);
+
+        ImGui::TableSetColumnIndex(2);
+        DrawDialCell("Blue Scale", &blueScale, def.blueScale, -0.75f, 0.75f, "Non-linear mid-tone curve boost/cut for **Blue** (`-0.75` to `+0.75`).", &blueTint);
+        ImGui::EndTable();
+    }
+
+    ImGui::Spacing();
+
+    // Triad 3: RGB Offset (Shadows / Additive)
+    if (ImGui::BeginTable("##triad_rgb_offset", 3, ImGuiTableFlags_SizingStretchSame, ImVec2(leftColWidth, 0.0f))) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        DrawDialCell("Red Offset", &redOffset, def.redOffset, -0.50f, 0.50f, "Linear additive shift for **Red** (`-0.50` to `+0.50`).", &redTint);
+
+        ImGui::TableSetColumnIndex(1);
+        DrawDialCell("Green Offset", &greenOffset, def.greenOffset, -0.50f, 0.50f, "Linear additive shift for **Green** (`-0.50` to `+0.50`).", &greenTint);
+
+        ImGui::TableSetColumnIndex(2);
+        DrawDialCell("Blue Offset", &blueOffset, def.blueOffset, -0.50f, 0.50f, "Linear additive shift for **Blue** (`-0.50` to `+0.50`).", &blueTint);
+        ImGui::EndTable();
+    }
+
+    ImGui::Spacing();
+
+    // Row 4: Optics (Vignette)
+    const float bottomSliderY = ImGui::GetCursorPosY();
+    DrawDialCell("Vignette", &vignette, def.vignette, 0.00f, 1.00f, "Darkens the outer edges of the screen (`0.00` = off, `1.00` = max).");
+
+#else
+    // ------------------------------------------------------------------------
+    // Classic Post-Processing Sliders (SliderWithReset)
+    // ------------------------------------------------------------------------
     const float sliderWidth = leftColWidth - 88.0f;
     ImGui::PushItemWidth(sliderWidth);
 
@@ -587,7 +793,6 @@ void SettingsImgWindow::buildInterface()
     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.28f, 0.60f, 0.96f, 1.00f));
     ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.34f, 0.68f, 1.00f, 1.00f));
 
-    const float topSliderY = ImGui::GetCursorPosY();
     ImGui::SliderWithReset("Brightness", &brightness, def.brightness, -0.50f, 0.50f, "%.2f", 0, 0.01f);
     ImGui::TimedTooltip::TextMD("Adjusts overall scene luminance offset (`-0.50` to `+0.50`).");
 
@@ -619,11 +824,11 @@ void SettingsImgWindow::buildInterface()
     ImGui::SliderWithReset("Vignette", &vignette, def.vignette, 0.00f, 1.00f, "%.2f", 0, 0.01f);
     ImGui::TimedTooltip::TextMD("Darkens the outer edges of the screen (`0.00` = off, `1.00` = maximum vignette).");
 
-    const float leftColBottomY = ImGui::GetCursorPosY();
-
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(1);
     ImGui::PopItemWidth();
+#endif
+    const float leftColBottomY = ImGui::GetCursorPosY();
     ImGui::Dummy(ImVec2(0.0f, 0.0f)); // Consumes cursor position to cleanly close group boundary without assert
     ImGui::EndGroup(); // End Left column
 
@@ -645,6 +850,8 @@ void SettingsImgWindow::buildInterface()
     if (isDefaultActive) ImGui::BeginDisabled();
     if (ImGui::ButtonLink(ICON_FA_UNDO " Reset All", actionBtnSize)) {
         ApplyPreset(PRESET_DEFAULT);
+        s_SelectedPresetFilename.clear();
+        s_ActiveCuratedPresetIdx = -1;
         ImGui::TimedTooltip::ClearActiveTooltip();
     }
     if (isDefaultActive) ImGui::EndDisabled();
@@ -665,7 +872,7 @@ void SettingsImgWindow::buildInterface()
 
         if (isUserActive) ImGui::BeginDisabled();
         if (ImGui::ButtonLink(ICON_FA_REDO " Restore", ImVec2(mainBtnWidth, btnHeight))) {
-            ApplyPreset(PRESET_USER);
+            RestoreSessionStartup();
             ImGui::TimedTooltip::ClearActiveTooltip();
         }
         if (isUserActive) ImGui::EndDisabled();
@@ -702,7 +909,7 @@ void SettingsImgWindow::buildInterface()
     } else {
         if (isUserActive) ImGui::BeginDisabled();
         if (ImGui::ButtonLink(ICON_FA_REDO " Restore", actionBtnSize)) {
-            ApplyPreset(PRESET_USER);
+            RestoreSessionStartup();
             ImGui::TimedTooltip::ClearActiveTooltip();
         }
         if (isUserActive) ImGui::EndDisabled();
@@ -726,50 +933,196 @@ void SettingsImgWindow::buildInterface()
 
     if (ImGui::BeginPopup("##restore_context_menu")) {
         if (ImGui::MenuItem(ICON_FA_REDO " Restore Session Startup", nullptr, false, !isUserActive)) {
-            ApplyPreset(PRESET_USER);
+            RestoreSessionStartup();
             ImGui::TimedTooltip::ClearActiveTooltip();
         }
         if (ImGui::MenuItem(ICON_FA_UNDO " Recover Last Discarded Edits", nullptr, false, hasDiscarded)) {
             RestoreDiscardedPreset();
+            s_SelectedPresetFilename.clear();
+            s_ActiveCuratedPresetIdx = -1;
             ImGui::TimedTooltip::ClearActiveTooltip();
         }
         ImGui::EndPopup();
     }
 
     // --------------------------------------------------------------------
-    // Bottom Pair: Load .ini (VG above Save) & Save .ini (aligns with Vignette)
+    // Middle Section: User Profiles (Profile Library in profiles/)
     // --------------------------------------------------------------------
-    ImGui::SetCursorPosY(bottomSliderY - btnHeight - VG);
-    // Distinct soft steel/slate blue accent for Load .ini:
+    ImGui::SetCursorPosY(topSliderY + (btnHeight + VG) * 2 + 6.0f);
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::TextDisabled("USER PROFILES");
+    if (HasUnsavedChanges()) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.95f, 0.70f, 0.20f, 1.00f), "*");
+        ImGui::TimedTooltip::TextMD("You have unsaved slider adjustments in memory.");
+    }
+
+    ImGui::SetNextItemWidth(actionBtnSize.x);
+    if (ImGui::FilePickerCombo("##user_presets", &s_SelectedPresetFilename, PROFILES_PATH, ".ini")) {
+        if (!s_SelectedPresetFilename.empty()) {
+            std::string fullPath = std::string(PROFILES_PATH) + "/" + s_SelectedPresetFilename;
+            LoadSettingsFromFile(fullPath);
+            sActiveProfileName = s_SelectedPresetFilename;
+            s_ActiveCuratedPresetIdx = -1;
+            ClearPrePresetScratchpad();
+            UpdateDiskSnapshot();
+            ImGui::TimedTooltip::ClearActiveTooltip();
+        }
+    }
+    ImGui::TimedTooltip::TextMD(s_SelectedPresetFilename.empty()
+        ? "Select a saved user profile from `" PROFILES_PATH_DISPLAY "`."
+        : ("Active profile: `" + s_SelectedPresetFilename + "`\nClick dropdown to switch profiles.").c_str());
+
+    // 1. Save (saves to currently active profile in profiles/):
+    bool hasActiveProfile = !s_SelectedPresetFilename.empty();
+    if (!hasActiveProfile) ImGui::BeginDisabled();
+    if (ImGui::ButtonLink(ICON_FA_SAVE " Save", actionBtnSize)) {
+        std::string fullPath = std::string(PROFILES_PATH) + "/" + s_SelectedPresetFilename;
+        SaveSettingsToFile(fullPath);
+        sActiveProfileName = s_SelectedPresetFilename;
+        s_ActiveCuratedPresetIdx = -1;
+        UpdateDiskSnapshot();
+        ImGui::TimedTooltip::ClearActiveTooltip();
+    }
+    if (!hasActiveProfile) ImGui::EndDisabled();
+    ImGui::TimedTooltip::TextMDProxy(
+        ImGui::GetItemID(),
+        ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled),
+        hasActiveProfile ? ("Save adjustments into `" + s_SelectedPresetFilename + "`.").c_str()
+                         : "No user profile is currently selected. Use 'Save As...' to create one."
+    );
+
+    // 2. Save As... (saves current adjustments as a new named profile in profiles/):
+    if (ImGui::ButtonLink(ICON_FA_PLUS " Save As...", actionBtnSize)) {
+        s_DefaultSaveName = GetSmartPresetDefaultFilename(s_ActiveCuratedPresetIdx, s_SelectedPresetFilename);
+        s_SaveModalOpen = true;
+        s_CloseAfterSaveAs = false;
+        ImGui::TimedTooltip::ClearActiveTooltip();
+    }
+    ImGui::TimedTooltip::TextMD("Save current adjustments as a new named profile in `" PROFILES_PATH_DISPLAY "` (does not alter your active preferred profile).");
+
+    // --------------------------------------------------------------------
+    // Bottom Section: Startup Configuration (X-Plane Boot Default via .prf)
+    // --------------------------------------------------------------------
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::TextDisabled("STARTUP DEFAULT");
+
+    std::string startupBadge;
+    if (sStartupActiveProfile.rfind("preset:", 0) == 0) {
+        startupBadge = sStartupActiveProfile.substr(7) + " (preset)";
+    } else if (!sStartupActiveProfile.empty()) {
+        startupBadge = sStartupActiveProfile;
+    } else {
+        startupBadge = "blu_fx.ini";
+    }
+
+    bool isAlreadyStartup = false;
+    std::string startupTooltip;
+
+    if (isCleanCuratedPreset) {
+        isAlreadyStartup = (sStartupActiveProfile == currentPresetRef);
+        if (isAlreadyStartup) {
+            startupTooltip = "<badge cyan>" + std::string(BLUfxPresetNames[s_ActiveCuratedPresetIdx]) + "</badge> is already your configured boot default.";
+        } else {
+            startupTooltip = "Set <badge cyan>" + std::string(BLUfxPresetNames[s_ActiveCuratedPresetIdx]) + "</badge> as your startup preset on X-Plane boot.";
+        }
+    } else if (!s_SelectedPresetFilename.empty()) {
+        isAlreadyStartup = (s_SelectedPresetFilename == sStartupActiveProfile && !HasUnsavedChanges());
+        if (isAlreadyStartup) {
+            startupTooltip = "<badge emerald>" + s_SelectedPresetFilename + "</badge> is already your configured boot default.";
+        } else if (HasUnsavedChanges()) {
+            startupTooltip = "Save adjustments into <badge emerald>" + s_SelectedPresetFilename + "</badge> and set as your boot default.";
+        } else {
+            startupTooltip = "Set <badge emerald>" + s_SelectedPresetFilename + "</badge> as your permanent default when X-Plane boots.";
+        }
+    } else {
+        // Dirty / customized look from scratchpad or tweaked preset:
+        isAlreadyStartup = false;
+        if (s_ActiveCuratedPresetIdx >= PRESET_POLAROID && s_ActiveCuratedPresetIdx < PRESET_MAX) {
+            startupTooltip = "Save adjustments derived from <badge cyan>" + std::string(BLUfxPresetNames[s_ActiveCuratedPresetIdx]) + "</badge> as a new profile and set as your permanent boot default.";
+        } else {
+            startupTooltip = "Save current customized look as a new profile and set as your permanent boot default.";
+        }
+    }
+
+    if (isAlreadyStartup) {
+        ImGui::TextColored(ImVec4(0.35f, 0.80f, 0.45f, 1.00f), ICON_FA_CHECK " %s", startupBadge.c_str());
+    } else {
+        ImGui::TextColored(ImVec4(0.70f, 0.75f, 0.82f, 1.00f), ICON_FA_STAR " %s", startupBadge.c_str());
+    }
+    ImGui::TimedTooltip::TextMD(
+        "Configured default profile loaded when X-Plane boots."
+    );
+
+    const float naturalLoadY = ImGui::GetCursorPosY() + VG;
+    const float alignedLoadY = bottomSliderY - btnHeight - VG;
+    ImGui::SetCursorPosY(std::max(naturalLoadY, alignedLoadY));
+
+    // Distinct forest/emerald green accent for Set as Startup:
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.52f, 0.30f, 0.85f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.62f, 0.36f, 1.00f));
+    if (isAlreadyStartup) ImGui::BeginDisabled();
+    if (ImGui::ButtonLink(ICON_FA_STAR " Set as Startup", actionBtnSize)) {
+        if (isCleanCuratedPreset) {
+            // Clean factory preset: store lightweight preset reference without redundant disk files
+            sStartupActiveProfile = currentPresetRef;
+            sActiveProfileName = currentPresetRef;
+            SavePreferences();
+            UpdateDiskSnapshot();
+        } else if (!s_SelectedPresetFilename.empty()) {
+            // Existing user profile: save to disk and update preferences
+            std::string fullPath = std::string(PROFILES_PATH) + "/" + s_SelectedPresetFilename;
+            SaveSettingsToFile(fullPath);
+            sActiveProfileName = s_SelectedPresetFilename;
+            sStartupActiveProfile = s_SelectedPresetFilename;
+            s_ActiveCuratedPresetIdx = -1;
+            SavePreferences();
+            UpdateDiskSnapshot();
+        } else {
+            // Dirty / customized look without a profile file: prompt Save As... to name the slot
+            s_DefaultSaveName = GetSmartPresetDefaultFilename(s_ActiveCuratedPresetIdx, s_SelectedPresetFilename);
+            s_SaveModalOpen = true;
+            s_SetAsStartupAfterSave = true;
+            s_CloseAfterSaveAs = false;
+        }
+        ImGui::TimedTooltip::ClearActiveTooltip();
+    }
+    if (isAlreadyStartup) ImGui::EndDisabled();
+    ImGui::PopStyleColor(2);
+    ImGui::TimedTooltip::TextMDProxy(
+        ImGui::GetItemID(),
+        ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled),
+        startupTooltip.c_str()
+    );
+
+    const float naturalSaveY = ImGui::GetCursorPosY() + VG;
+    const float alignedSaveY = bottomSliderY;
+    ImGui::SetCursorPosY(std::max(naturalSaveY, alignedSaveY));
+
+    // Distinct soft steel/slate blue accent for Reload Startup:
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.42f, 0.60f, 0.85f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.50f, 0.72f, 1.00f));
-    if (ImGui::ButtonLink(ICON_FA_FOLDER_OPEN " Load .ini", actionBtnSize)) {
+    if (ImGui::ButtonLink(ICON_FA_SYNC " Reload Startup", actionBtnSize)) {
         LoadSettings();
+        SyncUIStateWithActiveProfile();
+        UpdateDiskSnapshot();
         ImGui::TimedTooltip::ClearActiveTooltip();
     }
     ImGui::PopStyleColor(2);
-    ImGui::TimedTooltip::TextMD("Reload settings from `" CONFIG_PATH_DISPLAY "`, discarding unsaved changes.");
-
-    ImGui::SetCursorPosY(bottomSliderY);
-    // Distinct forest/emerald green accent for Save .ini:
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.52f, 0.30f, 0.85f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.62f, 0.36f, 1.00f));
-    if (ImGui::ButtonLink(ICON_FA_SAVE " Save .ini", actionBtnSize)) {
-        SaveSettings();
-        ImGui::TimedTooltip::ClearActiveTooltip();
+    if (!IsWindowMoving() && (ImGui::IsItemClicked(ImGuiMouseButton_Right) ||
+        (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)))) {
+        s_OpenModalOpen = true;
     }
-    ImGui::PopStyleColor(2);
-    ImGui::TimedTooltip::TextMD("Reload settings from `" CONFIG_PATH_DISPLAY "`, discarding unsaved changes.");
 
-    ImGui::SetCursorPosY(bottomSliderY);
-    // Distinct forest/emerald green accent for Save .ini:
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.52f, 0.30f, 0.85f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.62f, 0.36f, 1.00f));
-    if (ImGui::ButtonLink(ICON_FA_SAVE " Save .ini", actionBtnSize)) {
-        SaveSettings();
+    std::string reloadTooltip;
+    if (sStartupActiveProfile.rfind("preset:", 0) == 0) {
+        reloadTooltip = "Reload your configured startup preset (<badge cyan>" + sStartupActiveProfile.substr(7) + "</badge>), discarding session tweaks.\n\n*(Tip: Right-click to browse and open any `.ini` file)*";
+    } else {
+        reloadTooltip = "Reload your configured startup profile (<badge emerald>" + sStartupActiveProfile + "</badge>), discarding session tweaks.\n\n*(Tip: Right-click to browse and open any `.ini` file)*";
     }
-    ImGui::PopStyleColor(2);
-    ImGui::TimedTooltip::TextMD("Save current settings immediately to `" CONFIG_PATH_DISPLAY "`.");
+    ImGui::TimedTooltip::TextMD(reloadTooltip.c_str());
 
     ImGui::Dummy(ImVec2(0.0f, 0.0f));
     ImGui::EndGroup(); // End Right column
@@ -831,6 +1184,8 @@ void SettingsImgWindow::buildInterface()
     if (isDefaultActive) ImGui::BeginDisabled();
     if (ImGui::ButtonLink(ICON_FA_UNDO " Reset All")) {
         ApplyPreset(PRESET_DEFAULT);
+        s_SelectedPresetFilename.clear();
+        s_ActiveCuratedPresetIdx = -1;
         ImGui::TimedTooltip::ClearActiveTooltip();
     }
     if (isDefaultActive) ImGui::EndDisabled();
@@ -847,7 +1202,7 @@ void SettingsImgWindow::buildInterface()
 
     if (isUserActive) ImGui::BeginDisabled();
     if (ImGui::ButtonLink(ICON_FA_REDO " Restore")) {
-        ApplyPreset(PRESET_USER);
+        RestoreSessionStartup();
         ImGui::TimedTooltip::ClearActiveTooltip();
     }
     if (isUserActive) ImGui::EndDisabled();
@@ -889,11 +1244,13 @@ void SettingsImgWindow::buildInterface()
 
     if (ImGui::BeginPopup("##restore_context_optA")) {
         if (ImGui::MenuItem(ICON_FA_REDO " Restore Session Startup", nullptr, false, !isUserActive)) {
-            ApplyPreset(PRESET_USER);
+            RestoreSessionStartup();
             ImGui::TimedTooltip::ClearActiveTooltip();
         }
         if (ImGui::MenuItem(ICON_FA_UNDO " Recover Last Discarded Edits", nullptr, false, hasDiscardedOptA)) {
             RestoreDiscardedPreset();
+            s_SelectedPresetFilename.clear();
+            s_ActiveCuratedPresetIdx = -1;
             ImGui::TimedTooltip::ClearActiveTooltip();
         }
         ImGui::EndPopup();
@@ -904,6 +1261,8 @@ void SettingsImgWindow::buildInterface()
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.50f, 0.72f, 1.00f));
     if (ImGui::ButtonLink(ICON_FA_FOLDER_OPEN " Load .ini")) {
         LoadSettings();
+        SyncUIStateWithActiveProfile();
+        UpdateDiskSnapshot();
         ImGui::TimedTooltip::ClearActiveTooltip();
     }
     ImGui::PopStyleColor(2);
@@ -932,14 +1291,6 @@ void SettingsImgWindow::buildInterface()
     if (IM_BOLD_LARGER_FONT) ImGui::PopFont();
     ImGui::TimedTooltip::TextMD("Click any preset button below to immediately apply that style.");
 
-    int currentCuratedPresetIdx = -1;
-    for (int i = PRESET_POLAROID; i < PRESET_MAX; ++i) {
-        if (isActivePreset(&BLUfxPresets[i])) {
-            currentCuratedPresetIdx = i;
-            break;
-        }
-    }
-
     ImGui::BeginGroup();
     // 1-boxel subtle navy border around preset buttons for visual structure:
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
@@ -958,40 +1309,61 @@ void SettingsImgWindow::buildInterface()
                 int pIdx = indices[col];
                 if (pIdx >= PRESET_MAX) continue;
 
-                bool active = (currentCuratedPresetIdx == pIdx);
-                if (active) {
+                bool isBasePreset = (s_ActiveCuratedPresetIdx == pIdx);
+                bool isExactMatch = isBasePreset && isActivePreset(&BLUfxPresets[pIdx]);
+
+                if (isExactMatch) {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.52f, 0.88f, 0.95f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.26f, 0.59f, 0.98f, 1.00f));
+                } else if (isBasePreset) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.38f, 0.52f, 0.90f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.46f, 0.62f, 1.00f));
                 }
 
                 char btnLabel[64];
-                if (active) {
+                if (isExactMatch) {
                     std::snprintf(btnLabel, sizeof(btnLabel), ICON_FA_CHECK " %s##preset_%d", BLUfxPresetNames[pIdx], pIdx);
+                } else if (isBasePreset) {
+                    std::snprintf(btnLabel, sizeof(btnLabel), ICON_FA_PEN " %s*##preset_%d", BLUfxPresetNames[pIdx], pIdx);
                 } else {
                     std::snprintf(btnLabel, sizeof(btnLabel), "%s##preset_%d", BLUfxPresetNames[pIdx], pIdx);
                 }
 
                 if (ImGui::ButtonLink(btnLabel, ImVec2(-FLT_MIN, 0.0f))) {
                     ImGui::TimedTooltip::ClearActiveTooltip();
-                    if (active) {
+                    if (isBasePreset) {
                         // Toggled off! Restore pre-preset scratchpad or startup baseline:
                         if (HasPrePresetScratchpad()) {
                             RestorePrePresetScratchpad();
+                            s_SelectedPresetFilename = s_PrePresetFilename;
+                            s_ActiveCuratedPresetIdx = s_PrePresetActiveCuratedIdx;
+                            if (!s_PrePresetFilename.empty()) {
+                                sActiveProfileName = s_PrePresetFilename;
+                            }
+                            UpdateDiskSnapshot();
                         } else {
-                            ApplyPreset(PRESET_USER);
+                            RestoreSessionStartup();
                         }
                     } else {
                         // Entering presets: if coming from a non-curated state, remember it:
-                        if (currentCuratedPresetIdx == -1) {
+                        if (s_ActiveCuratedPresetIdx == -1) {
                             SavePrePresetScratchpad();
+                            s_PrePresetFilename = s_SelectedPresetFilename;
+                            s_PrePresetActiveCuratedIdx = -1;
                         }
+                        s_SelectedPresetFilename.clear();
+                        s_ActiveCuratedPresetIdx = pIdx;
                         ApplyPreset(pIdx);
                     }
                 }
 
-                if (active) {
+                if (isExactMatch) {
                     ImGui::TimedTooltip::TextMD(
                         "Active preset: **%s**\n%s\n\n*(Click again to toggle off and revert to previous settings)*",
+                        BLUfxPresetNames[pIdx], BLUfxPresetDescriptions[pIdx]);
+                } else if (isBasePreset) {
+                    ImGui::TimedTooltip::TextMD(
+                        "Base preset: **%s (tweaked)**\n%s\n\n*(Click to toggle off and revert to previous settings)*",
                         BLUfxPresetNames[pIdx], BLUfxPresetDescriptions[pIdx]);
                 } else {
                     ImGui::TimedTooltip::TextMD(
@@ -999,7 +1371,7 @@ void SettingsImgWindow::buildInterface()
                         BLUfxPresetNames[pIdx], BLUfxPresetDescriptions[pIdx]);
                 }
 
-                if (active) {
+                if (isExactMatch || isBasePreset) {
                     ImGui::PopStyleColor(2);
                 }
             }
@@ -1017,12 +1389,13 @@ void SettingsImgWindow::buildInterface()
     if (LEGACY_FEATURES) {
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.10f, 0.14f, 0.22f, 0.85f));
+        const float legacySliderWidth = ImGui::GetContentRegionAvail().x * 0.60f;
 
         ImGui::Separator();
         if (IM_BOLD_FONT) ImGui::PushFont(IM_BOLD_FONT);
         ImGui::TextUnformatted("Raleigh Scale (X-Plane 11)");
         if (IM_BOLD_FONT) ImGui::PopFont();
-        ImGui::PushItemWidth(sliderWidth);
+        ImGui::PushItemWidth(legacySliderWidth);
         if (ImGui::SliderWithReset("Raleigh Scale", &raleighScale, DEFAULT_RALEIGH_SCALE, 1.0f, 100.0f, "%.0f", 0, 1.0f)) {
             UpdateRaleighScale(0);
         }
@@ -1040,7 +1413,7 @@ void SettingsImgWindow::buildInterface()
         }
         ImGui::TimedTooltip::TextMD("Limits X-Plane's maximum frame rate to smooth out frame-time spikes.");
 
-        ImGui::PushItemWidth(sliderWidth);
+        ImGui::PushItemWidth(legacySliderWidth);
         ImGui::SliderWithReset("Max FPS", &maxFps, DEFAULT_MAX_FRAME_RATE, 20.0f, 200.0f, "%.0f fps", 0, 1.0f);
         ImGui::TimedTooltip::TextMD("Target maximum frame rate when FPS-Limiter is enabled (`20` to `200` FPS).");
         ImGui::PopItemWidth();
@@ -1056,7 +1429,7 @@ void SettingsImgWindow::buildInterface()
         }
         ImGui::TimedTooltip::TextMD("Automatically pauses Cinema Verite camera shake in the 3D cockpit while you move the mouse.");
 
-        ImGui::PushItemWidth(sliderWidth);
+        ImGui::PushItemWidth(legacySliderWidth);
         ImGui::SliderWithReset("On input disable for", &disableCinemaVeriteTime, DEFAULT_DISABLE_CINEMA_VERITE_TIME, 1.0f, 30.0f, "%.0f sec", 0, 1.0f);
         ImGui::TimedTooltip::TextMD("Duration (in seconds) to keep Cinema Verite paused after mouse interaction stops (`1` to `30` sec).");
         ImGui::PopItemWidth();
@@ -1098,46 +1471,167 @@ void SettingsImgWindow::buildInterface()
     }
 
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(410.0f, 0.0f), ImVec2(520.0f, 600.0f));
 
     if (ImGui::BeginPopupModal("Unsaved Changes##close_confirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         if (IM_BOLD_FONT) ImGui::PushFont(IM_BOLD_FONT);
-        ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE "  Save Changes to Disk?");
+        ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE "  Save Adjustments?");
         if (IM_BOLD_FONT) ImGui::PopFont();
 
         ImGui::Spacing();
-        ImGui::TextUnformatted("You have adjusted settings that have not been saved to:");
-        ImGui::TextColored(ImVec4(0.40f, 0.80f, 1.00f, 1.00f), "  " CONFIG_PATH_DISPLAY);
+        bool hasActiveProfile = !s_SelectedPresetFilename.empty();
+        if (hasActiveProfile) {
+            ImGui::TextUnformatted("You have unsaved adjustments to profile:");
+            ImGui::TextColored(ImVec4(0.40f, 0.80f, 1.00f, 1.00f), "  %s", s_SelectedPresetFilename.c_str());
+        } else if (isCleanCuratedPreset) {
+            ImGui::TextUnformatted("You are auditioning factory preset:");
+            ImGui::TextColored(ImVec4(0.40f, 0.80f, 1.00f, 1.00f), "  %s", BLUfxPresetNames[s_ActiveCuratedPresetIdx]);
+        } else if (s_ActiveCuratedPresetIdx >= PRESET_POLAROID && s_ActiveCuratedPresetIdx < PRESET_MAX) {
+            ImGui::TextUnformatted("You have unsaved adjustments derived from preset:");
+            ImGui::TextColored(ImVec4(0.40f, 0.80f, 1.00f, 1.00f), "  %s", BLUfxPresetNames[s_ActiveCuratedPresetIdx]);
+        } else {
+            ImGui::TextUnformatted("You have unsaved adjustments to your session scratchpad.");
+        }
         ImGui::TextUnformatted("What would you like to do before closing?");
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
 
-        // Distinct forest green accent for Save & Close:
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.52f, 0.30f, 0.85f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.62f, 0.36f, 1.00f));
-        if (ImGui::ButtonLink(ICON_FA_SAVE " Save & Close")) {
-            SaveSettings();
+        const float halfBtnW = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+
+        // Row 1: Save Actions (50/50 split)
+        // Left: Save & Close (saves to active profile, closes)
+        if (hasActiveProfile) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.52f, 0.30f, 0.85f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.62f, 0.36f, 1.00f));
+            std::string saveLabel = ICON_FA_SAVE " Save & Close";
+            if (ImGui::ButtonLink(saveLabel.c_str(), ImVec2(halfBtnW, 0.0f))) {
+                std::string fullPath = std::string(PROFILES_PATH) + "/" + s_SelectedPresetFilename;
+                SaveSettingsToFile(fullPath);
+                sActiveProfileName = s_SelectedPresetFilename;
+                UpdateDiskSnapshot();
+                mShowCloseConfirmModal = false;
+                ImGui::CloseCurrentPopup();
+                SetVisible(false);
+            }
+            ImGui::PopStyleColor(2);
+            ImGui::TimedTooltip::TextMD(("Save current adjustments into <badge emerald>" + s_SelectedPresetFilename + "</badge> and close.").c_str());
+
+            ImGui::SameLine();
+        } else if (isCleanCuratedPreset) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.52f, 0.30f, 0.85f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.62f, 0.36f, 1.00f));
+            std::string startupLabel = ICON_FA_STAR " Set Startup & Close";
+            if (ImGui::ButtonLink(startupLabel.c_str(), ImVec2(halfBtnW, 0.0f))) {
+                sStartupActiveProfile = currentPresetRef;
+                sActiveProfileName = currentPresetRef;
+                SavePreferences();
+                UpdateDiskSnapshot();
+                mShowCloseConfirmModal = false;
+                ImGui::CloseCurrentPopup();
+                SetVisible(false);
+            }
+            ImGui::PopStyleColor(2);
+            ImGui::TimedTooltip::TextMD(("Set <badge cyan>" + std::string(BLUfxPresetNames[s_ActiveCuratedPresetIdx]) + "</badge> as your permanent startup preset and close.").c_str());
+
+            ImGui::SameLine();
+        }
+
+        // Right (or full-width if neither active profile nor clean preset): Save As... (saves to new file without altering startup default)
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.42f, 0.60f, 0.85f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.50f, 0.72f, 1.00f));
+        const bool hasLeftBtn = hasActiveProfile || isCleanCuratedPreset;
+        const ImVec2 saveAsBtnSz = hasLeftBtn ? ImVec2(halfBtnW, 0.0f) : ImVec2(-FLT_MIN, 0.0f);
+        if (ImGui::ButtonLink(ICON_FA_PLUS " Save As...", saveAsBtnSz)) {
+            s_DefaultSaveName = GetSmartPresetDefaultFilename(s_ActiveCuratedPresetIdx, s_SelectedPresetFilename);
+            s_SaveModalOpen = true;
+            s_CloseAfterSaveAs = true;
+            mShowCloseConfirmModal = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::TimedTooltip::TextMD("Save adjustments to a new named profile without changing your startup default, then close.");
+
+        ImGui::Spacing();
+
+        // Row 2: Non-saving Exits (50/50 split)
+        // Left: Keep Tweaks & Close (leaves live adjustments active in memory, touches no files on disk, closes window)
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.35f, 0.50f, 0.85f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.42f, 0.60f, 1.00f));
+        if (ImGui::ButtonLink(ICON_FA_EYE " Keep Tweaks & Close", ImVec2(halfBtnW, 0.0f))) {
             mShowCloseConfirmModal = false;
             ImGui::CloseCurrentPopup();
             SetVisible(false);
         }
         ImGui::PopStyleColor(2);
+        ImGui::TimedTooltip::TextMD("Keep your adjustments active on screen in memory without saving to any file on disk.");
 
         ImGui::SameLine();
-        if (ImGui::ButtonLink(ICON_FA_TRASH_ALT " Discard & Close")) {
+
+        // Right: Revert & Close (reverts to disk baseline, closes window)
+        if (ImGui::ButtonLink(ICON_FA_TRASH_ALT " Revert & Close", ImVec2(halfBtnW, 0.0f))) {
             CaptureDiscardedPreset();
             LoadSettings();
+            SyncUIStateWithActiveProfile();
+            UpdateDiskSnapshot();
             mShowCloseConfirmModal = false;
             ImGui::CloseCurrentPopup();
             SetVisible(false);
         }
+        ImGui::TimedTooltip::TextMD("Revert adjustments to the saved disk baseline and close.");
 
-        ImGui::SameLine();
-        if (ImGui::ButtonLink(ICON_FA_UNDO " Cancel")) {
+        ImGui::Spacing();
+
+        // Row 3: Stay in Window
+        if (ImGui::ButtonLink(ICON_FA_UNDO " Cancel", ImVec2(-FLT_MIN, 0.0f))) {
             mShowCloseConfirmModal = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::TimedTooltip::TextMD("Stay in the settings window without closing.");
 
         ImGui::EndPopup();
+    }
+
+    // ------------------------------------------------------------------------
+    // In-Cockpit File Dialog Modals (Save Preset As... & Open Preset File)
+    // ------------------------------------------------------------------------
+    if (s_SaveModalOpen) {
+        if (ImGui::SaveFileDialog("Save Color Profile", &s_SaveModalOpen, &s_SavedFilePath, PROFILES_PATH, s_DefaultSaveName.c_str(), ".ini")) {
+            SaveSettingsToFile(s_SavedFilePath);
+            size_t slash = s_SavedFilePath.find_last_of("/\\");
+            std::string filename = (slash != std::string::npos) ? s_SavedFilePath.substr(slash + 1) : s_SavedFilePath;
+
+            s_SelectedPresetFilename = filename;
+            sActiveProfileName = filename;
+            s_ActiveCuratedPresetIdx = -1;
+
+            if (s_SetAsStartupAfterSave) {
+                s_SetAsStartupAfterSave = false;
+                sStartupActiveProfile = filename;
+                SavePreferences();
+            }
+            UpdateDiskSnapshot();
+
+            if (s_CloseAfterSaveAs) {
+                s_CloseAfterSaveAs = false;
+                SetVisible(false);
+            }
+        }
+        if (!s_SaveModalOpen) {
+            s_CloseAfterSaveAs = false;
+            s_SetAsStartupAfterSave = false;
+        }
+    }
+
+    if (s_OpenModalOpen) {
+        if (ImGui::OpenFileDialog("Open Preset File", &s_OpenModalOpen, &s_OpenFilePath, PROFILES_PATH, ".ini")) {
+            LoadSettingsFromFile(s_OpenFilePath);
+            size_t slash = s_OpenFilePath.find_last_of("/\\");
+            s_SelectedPresetFilename = (slash != std::string::npos) ? s_OpenFilePath.substr(slash + 1) : s_OpenFilePath;
+            sActiveProfileName = s_SelectedPresetFilename;
+            s_ActiveCuratedPresetIdx = -1;
+            ClearPrePresetScratchpad();
+            UpdateDiskSnapshot();
+        }
     }
 }

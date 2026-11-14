@@ -16,7 +16,7 @@ SOURCES = \
 
 LIBS = $(SRC_BASE)/SDK/Libraries/Mac/XPLM.framework/XPLM \
 	$(SRC_BASE)/SDK/Libraries/Mac/XPWidgets.framework/XPWidgets \
-	-framework OpenGL -framework CoreFoundation -lstdc++ -lcurl
+	-framework OpenGL -framework CoreFoundation -framework ApplicationServices -lstdc++ -lcurl
 
 INCLUDES = \
 	-I$(SRC_BASE)/SDK/CHeaders/XPLM \
