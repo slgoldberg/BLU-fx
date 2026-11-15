@@ -53,14 +53,14 @@ public:
 #if BLUFX_SIDE_BY_SIDE_LAYOUT
 #if BLUFX_EXPERIMENTAL_KNOB_UI
     static constexpr int DEFAULT_WIDTH       = 520;
-    static constexpr int DEFAULT_HEIGHT      = 525;
+    static constexpr int DEFAULT_HEIGHT      = 555;
 #else
     static constexpr int DEFAULT_WIDTH       = 465;
-    static constexpr int DEFAULT_HEIGHT      = 525;
+    static constexpr int DEFAULT_HEIGHT      = 555;
 #endif
 #else
     static constexpr int DEFAULT_WIDTH       = 430;
-    static constexpr int DEFAULT_HEIGHT      = 525;
+    static constexpr int DEFAULT_HEIGHT      = 555;
 #endif
 
     SettingsImgWindow();

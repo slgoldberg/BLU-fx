@@ -347,12 +347,14 @@ static WindowGeometry CalcDefaultSettingsGeometry()
         h += 180; // Add room if XP11 Raleigh Scale, FPS-Limiter & Cinema Verite sections are shown
     }
 
-    if (sHasSavedPosition) {
+    if (sHasSavedPosition || (sWindowLeft >= 0 && sWindowTop >= 0)) {
+        int left = sHasSavedPosition ? sLastInSimLeft : sWindowLeft;
+        int top  = sHasSavedPosition ? sLastInSimTop  : sWindowTop;
         return WindowGeometry::Sanitize(
-            sLastInSimLeft,
-            sLastInSimTop,
-            sLastInSimLeft + w,
-            sLastInSimTop - h,
+            left,
+            top,
+            left + w,
+            top - h,
             w, h,
             40,
             WindowSanitizeMode::KeepVisibleMargin
@@ -421,6 +423,7 @@ void SettingsImgWindow::RequestClose()
         mShowCloseConfirmModal = true;
     } else {
         SetVisible(false);
+        SavePreferences();
     }
 }
 
@@ -472,27 +475,50 @@ void SettingsImgWindow::scheduleModeChange(XPLMWindowPositioningMode newMode)
     }
 }
 
+static const char* const s_AboutTooltipMD =
+    "**" NAME " v" VERSION "**\n\n"
+    "* **Original Author:** Matteo Hausner (v1.0)\n"
+    "* **Modernization & Features:** Steve Goldberg (`@slgoldberg` on X-Plane.org)\n"
+    "* **UI Framework:** `ImgWindow v2` + `ImGee UX`\n"
+    "* **Compatibility:** X-Plane 12 & 11 (macOS universal, Windows, Linux)\n\n"
+    "*(Click button to toggle or click away to close)*";
+
 void SettingsImgWindow::drawCustomTitleBar()
 {
+    // Tighten the title bar top margin so the title text, grip lines, and buttons sit centered in the title bar:
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 3.0f);
+
     if (IM_BOLD_FONT) ImGui::PushFont(IM_BOLD_FONT);
-    ImGui::TextUnformatted(ICON_FA_SLIDERS_H "  " NAME " v" VERSION " — Settings");
+    ImGui::TextUnformatted(ICON_FA_SLIDERS_H "  " NAME " v" VERSION " -- Settings");
     if (IM_BOLD_FONT) ImGui::PopFont();
 
     ImGui::SameLine();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 start = ImGui::GetCursorScreenPos();
     float availX = ImGui::GetContentRegionAvail().x;
-    float gripWidth = availX - 65.0f;
+    bool showTitleAbout = (sPreviewMode == PREVIEW_MODE_SPLIT);
+    float gripWidth = availX - (showTitleAbout ? 90.0f : 65.0f);
 
     if (gripWidth > 20.0f) {
-        start.y += 3.0f; // Shifted up 2px (from 5.0f) to be vertically centered relative to title & buttons
+        // 3 grip lines moved up 1 boxel (startY = centerY - 4.0f) with 1 extra boxel spacing (4.0f):
+        const float centerY = start.y + 7.25f;
+        const float lineSpacing = 4.0f;
+        const float startY = centerY - lineSpacing; // 3 lines: start.y + 3.25f, start.y + 7.25f, start.y + 11.25f
+
         for (int i = 0; i < 3; ++i) {
-            dl->AddLine(start, ImVec2(start.x + gripWidth, start.y), IM_COL32(160, 160, 160, 140), 1.0f);
-            start.y += 4.0f;
+            float y = startY + (float)i * lineSpacing;
+            dl->AddLine(ImVec2(start.x, y), ImVec2(start.x + gripWidth, y), IM_COL32(160, 165, 175, 105), 1.0f);
         }
     }
 
-    ImGui::SameLine(ImGui::GetWindowWidth() - 60.0f);
+    if (showTitleAbout) {
+        ImGui::SameLine(ImGui::GetWindowWidth() - 85.0f);
+        ImGui::SmallButtonLink(ICON_FA_INFO_CIRCLE "##about");
+        ImGui::TimedTooltip::TextMD(s_AboutTooltipMD);
+        ImGui::SameLine();
+    } else {
+        ImGui::SameLine(ImGui::GetWindowWidth() - 60.0f);
+    }
     if (IsPoppedOut()) {
         if (ImGui::SmallButtonLink(ICON_FA_WINDOW_MAXIMIZE "##popin")) {
             scheduleModeChange(xplm_WindowPositionFree);
@@ -631,27 +657,175 @@ void SettingsImgWindow::buildInterface()
     drawCustomTitleBar();
 
     // ------------------------------------------------------------------------
-    // Header & Attribution Badge
+    // Header: Controls & Live Preview Bar
     // ------------------------------------------------------------------------
     bool ppEnabled = (postProcesssingEnabled != 0);
     static const char* const s_PostProcTooltips[2] = {
         "Post-processing filters are currently **OFF**.\nClick or scroll mouse-wheel up to enable.",
-        "Post-processing filters are currently **ON**.\n*(While this Settings window is open, the right half of your screen previews the active filter for live A/B comparison!)*"
+        "Post-processing filters are currently **ON**."
     };
-    if (ImGui::ToggleButton("Enable Post-Processing", &ppEnabled, ImVec2(0, 0), s_PostProcTooltips)) {
-        SetPostProcessingEnabled(ppEnabled);
+
+    const float previewRightWidth = 145.0f;
+    const float rightColX = ImGui::GetWindowWidth() - previewRightWidth - ImGui::GetStyle().WindowPadding.x;
+
+    // Row 1 Left: Enable toggle
+    bool isTemporarilyOverridden = sMomentaryFullView && !postProcesssingEnabled;
+    bool ppDisplayState = (postProcesssingEnabled != 0) || isTemporarilyOverridden;
+    if (isTemporarilyOverridden) ImGui::BeginDisabled();
+    if (ImGui::ToggleButton("Enable Post-Processing", &ppDisplayState, ImVec2(0, 0), s_PostProcTooltips)) {
+        SetPostProcessingEnabled(ppDisplayState);
+    }
+    if (isTemporarilyOverridden) ImGui::EndDisabled();
+
+    // Row 1 Right: When in Full preview mode, "Hold for Full View" is irrelevant,
+    // so display the 1-line info attribution link. In Split mode, show the momentary button.
+    if (sPreviewMode == PREVIEW_MODE_FULL) {
+        float infoWidth = ImGui::CalcTextSize(ICON_FA_INFO_CIRCLE " " NAME " v" VERSION).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        ImGui::SameLine(ImGui::GetWindowWidth() - infoWidth - ImGui::GetStyle().WindowPadding.x);
+
+        ImGui::SmallButtonLink(ICON_FA_INFO_CIRCLE " " NAME " v" VERSION "##about");
+        ImGui::TimedTooltip::TextMD(s_AboutTooltipMD);
+    } else {
+        // Split mode: Momentary "Hold for Full View" button
+        ImGui::SameLine(rightColX);
+
+        static XPLMCommandRef s_HoldCmdRef = NULL;
+        if (!s_HoldCmdRef) {
+            s_HoldCmdRef = XPLMFindCommand("blu_fx/post_processing/momentary");
+        }
+
+        bool isButtonActive = sMomentaryFullView;
+        if (isButtonActive) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.15f, 1.00f)); // warm amber lit up while active
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.62f, 0.22f, 1.00f));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.28f, 0.38f, 0.85f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.26f, 0.36f, 0.48f, 1.00f));
+        }
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.85f, 0.55f, 0.15f, 1.00f));
+
+        ImGui::ButtonLink(ICON_FA_EYE " Hold for Full View", ImVec2(previewRightWidth, 0.0f));
+
+        bool isMouseDown = ImGui::IsItemActive();
+        static bool s_PrevMouseDown = false;
+        if (isMouseDown != s_PrevMouseDown) {
+            s_PrevMouseDown = isMouseDown;
+            if (s_HoldCmdRef) {
+                if (isMouseDown) {
+                    XPLMCommandBegin(s_HoldCmdRef);
+                } else {
+                    XPLMCommandEnd(s_HoldCmdRef);
+                }
+            } else {
+                SetMomentaryFullView(isMouseDown);
+            }
+        }
+
+        ImGui::PopStyleColor(3);
+
+        // Fast-fading tooltip config for this action button (disappears quickly so it doesn't obstruct the view):
+        static ImGui::TimedTooltip::TooltipConfig s_HoldFullTooltipCfg;
+        static bool s_HoldFullTooltipCfgInit = false;
+        if (!s_HoldFullTooltipCfgInit) {
+            s_HoldFullTooltipCfg = ImGui::TimedTooltip::GetCurrentTooltipConfig();
+            s_HoldFullTooltipCfg.max_display_cycles = 150;      // ~2.5s at 60fps (snappy auto-hide)
+            s_HoldFullTooltipCfg.size_skew_multiplier = 0.0f;   // don't inflate timeout based on text length
+            s_HoldFullTooltipCfg.enable_wiggle_latch = false;   // don't restart timer on small mouse jitter
+            s_HoldFullTooltipCfgInit = true;
+        }
+
+        ImGui::TimedTooltip::TextMD(
+            &s_HoldFullTooltipCfg,
+            "**Momentary Full View:**\n"
+            "Press and hold to view 100%% post-processing across the entire screen.\n\n"
+            "You can also add this to a joystick button or keyboard shortcut using:   "
+            "<code dark>blu_fx/post_processing/momentary</code>"
+        );
     }
 
-    float infoWidth = ImGui::CalcTextSize(ICON_FA_INFO_CIRCLE " " NAME " v" VERSION).x + 4.0f;
-    ImGui::SameLine(ImGui::GetWindowWidth() - infoWidth - 15.0f);
-    ImGui::TextLink(ICON_FA_INFO_CIRCLE " " NAME " v" VERSION);
-    ImGui::TimedTooltip::TextMD(
-        "**" NAME " v" VERSION " (64-bit)**\n"
-        "* **Original Author:** Matteo Hausner\n"
-        "* **64-bit Port & Modernization:** Steve Goldberg (`@slgoldberg`)\n"
-        "* **UI Engine:** `ImgWindow v2` + `ImGee UX`\n"
-        "\n*(Click to toggle this info card)*"
-    );
+    // Row 2: Live Preview Mode & Split Curtain Wipe
+    ImGui::Spacing();
+
+    // Row 2 Left: Split Wipe slider OR Fullscreen active text
+    if (!ppEnabled) ImGui::BeginDisabled();
+    if (sPreviewMode == PREVIEW_MODE_SPLIT) {
+        const float gap = ImGui::GetStyle().ItemSpacing.x;
+        const float iconW = std::max(ImGui::CalcTextSize(ICON_FA_EYE).x, ImGui::CalcTextSize(ICON_FA_EYE_SLASH).x);
+        const float eyeBtnWidth = iconW + ImGui::GetStyle().FramePadding.x * 2.0f + 6.0f; // ~28px, comfortably fits FA eye-slash
+        const float eyeX = rightColX - gap - eyeBtnWidth;
+        const float sliderTotalWidth = (eyeX - gap) - ImGui::GetCursorPosX();
+
+        ImGui::PushItemWidth(std::max(sliderTotalWidth, 80.0f));
+        float splitPercent = sPreviewSplitPosition * 100.0f;
+        if (ImGui::SliderWithReset("##wipe_pos", &splitPercent, 50.0f, 5.0f, 95.0f, "Wipe: %.0f%%", 0, 1.0f)) {
+            sPreviewSplitPosition = splitPercent / 100.0f;
+        }
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            SavePreferences();
+        }
+        ImGui::PopItemWidth();
+        ImGui::TimedTooltip::TextMD(
+            "**Curtain Wipe Position:**\n"
+            "Adjust where the split screen boundary sits across your monitor (`5%%` to `95%%`).\n"
+            "*(Raw native scenery on the left, active color grade on the right)*"
+        );
+
+        ImGui::SameLine(eyeX);
+        if (ImGui::ButtonLink(sShowSplitDivider ? ICON_FA_EYE "##div" : ICON_FA_EYE_SLASH "##div", ImVec2(eyeBtnWidth, 0.0f))) {
+            sShowSplitDivider = !sShowSplitDivider;
+            SavePreferences();
+        }
+        ImGui::TimedTooltip::TextMD(sShowSplitDivider
+            ? "Split hairline divider is **ON**.\nClick to hide for direct edge-to-edge pixel comparison."
+            : "Split hairline divider is **OFF**.\nClick to show the vertical split boundary.");
+    } else {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled(ICON_FA_DESKTOP " Full-screen live grading active");
+        ImGui::TimedTooltip::TextMD(
+            "**Full-Screen Preview Active:**\n"
+            "Color adjustments are applied across 100%% of your display while the window is open.\n"
+            "Switch to **Split** to compare against raw scenery side by side."
+        );
+    }
+    if (!ppEnabled) ImGui::EndDisabled();
+
+    // Row 2 Right: [ Full | Split ] segmented buttons (Always enabled so users can configure preview mode)
+    ImGui::SameLine(rightColX);
+    const float halfBtnW = (previewRightWidth - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+
+    // Full button:
+    bool isFull = (sPreviewMode == PREVIEW_MODE_FULL);
+    if (isFull) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.45f, 0.70f, 0.90f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.52f, 0.80f, 1.00f));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.22f, 0.28f, 0.70f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.30f, 0.38f, 0.85f));
+    }
+    if (ImGui::ButtonLink(ICON_FA_EXPAND " Full", ImVec2(halfBtnW, 0.0f))) {
+        sPreviewMode = PREVIEW_MODE_FULL;
+        SavePreferences();
+    }
+    ImGui::PopStyleColor(2);
+    ImGui::TimedTooltip::TextMD("Apply color adjustments across 100%% of the screen while tuning.");
+
+    ImGui::SameLine();
+
+    // Split button:
+    bool isSplit = (sPreviewMode == PREVIEW_MODE_SPLIT);
+    if (isSplit) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.45f, 0.70f, 0.90f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.52f, 0.80f, 1.00f));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.22f, 0.28f, 0.70f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.30f, 0.38f, 0.85f));
+    }
+    if (ImGui::ButtonLink(ICON_FA_COLUMNS " Split", ImVec2(halfBtnW, 0.0f))) {
+        sPreviewMode = PREVIEW_MODE_SPLIT;
+        SavePreferences();
+    }
+    ImGui::PopStyleColor(2);
+    ImGui::TimedTooltip::TextMD("Split screen: raw scenery on left, active grade on right.");
 
     ImGui::Separator();
 
@@ -1456,11 +1630,15 @@ void SettingsImgWindow::buildInterface()
         SetWindowGeometry(geom.left, geom.top, geom.right, geom.bottom);
     }
 
-    // Continuously remember window position in-memory while inside the simulator:
+    // Continuously remember window position in-memory and update preferences:
     if (!IsPoppedOut() && (right - left) > 0 && (top - bottom) > 0) {
-        sLastInSimLeft = left;
-        sLastInSimTop  = top;
-        sHasSavedPosition = true;
+        if (sLastInSimLeft != left || sLastInSimTop != top) {
+            sLastInSimLeft = left;
+            sLastInSimTop  = top;
+            sHasSavedPosition = true;
+            sWindowLeft = left;
+            sWindowTop  = top;
+        }
     }
 
     // ------------------------------------------------------------------------

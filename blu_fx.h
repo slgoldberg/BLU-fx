@@ -151,6 +151,7 @@ void RestorePrePresetScratchpad(void);
 void ClearPrePresetScratchpad(void);
 bool HasPrePresetScratchpad(void);
 void ApplyPreset(int presetIdx);
+void UpdatePostProcessingMenuState(void);
 void SetPostProcessingEnabled(bool enabled);
 void SetFpsLimiterEnabled(bool enabled);
 void SetControlCinemaVeriteEnabled(bool enabled);
@@ -163,6 +164,18 @@ bool LoadSettingsFromFile(const std::string& path);
 void EnsureProfilesDirectoryExists(void);
 void EnsurePresetsDirectoryExists(void); // alias
 
+// Live Preview Modes:
+enum BluFxPreviewMode {
+    PREVIEW_MODE_SPLIT = 0,
+    PREVIEW_MODE_FULL  = 1
+};
+
+extern int sPreviewMode;
+extern float sPreviewSplitPosition;
+extern bool sMomentaryFullView;
+extern bool sShowSplitDivider;
+void SetMomentaryFullView(bool active);
+
 // Application Preferences (Output/preferences/blu_fx.prf):
 extern std::string sActiveProfileName;
 extern std::string sStartupActiveProfile;
@@ -170,6 +183,8 @@ extern std::string sSessionInitialProfile;
 extern std::string sUiMode;
 extern float sUiOpacity;
 extern int sConfirmOnClose;
+extern int sWindowLeft;
+extern int sWindowTop;
 
 std::string GetPrefsFilePath(void);
 bool LoadPreferences(void);

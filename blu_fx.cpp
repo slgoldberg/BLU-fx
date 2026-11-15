@@ -554,13 +554,29 @@ static XPLMWindowID fakeWindow = NULL;
 static XPLMDataRef cinemaVeriteDataRef = NULL, viewTypeDataRef = NULL, raleighScaleDataRef = NULL, overrideControlCinemaVeriteDataRef = NULL;
 static XPLMDataRef xplmVersionDataRef = NULL;
 
-// Modern ImgWindow v2 Settings Window instance & toggle command:
+// Modern ImgWindow v2 Settings Window instance & toggle commands:
 static std::unique_ptr<SettingsImgWindow> g_SettingsWindow;
 static XPLMCommandRef g_ToggleSettingsCmd = NULL;
+static XPLMCommandRef g_TogglePostProcessingCmd = NULL;
+static XPLMCommandRef g_MomentaryPostProcessingCmd = NULL;
+static XPLMMenuID g_BluFxMenu = NULL;
+static int g_TogglePostProcessingMenuItemIdx = -1;
+
+void UpdatePostProcessingMenuState(void)
+{
+    if (g_BluFxMenu != NULL && g_TogglePostProcessingMenuItemIdx >= 0) {
+        XPLMCheckMenuItem(g_BluFxMenu, g_TogglePostProcessingMenuItemIdx,
+            postProcesssingEnabled ? xplm_Menu_Checked : xplm_Menu_Unchecked);
+    }
+}
 
 // draw-callback that adds post-processing
 static int PostProcessingCallback(XPLMDrawingPhase inPhase, int inIsBefore, void *inRefcon)
 {
+    if (!postProcesssingEnabled && !sMomentaryFullView) {
+        return 1;
+    }
+
     int x, y;
     XPLMGetScreenSize(&x, &y);
 
@@ -623,7 +639,7 @@ static int PostProcessingCallback(XPLMDrawingPhase inPhase, int inIsBefore, void
     int sceneLocation = glGetUniformLocation(program, "scene");
     glUniform1i(sceneLocation, 0);
 
-    glPushAttrib(GL_VIEWPORT_BIT);
+    glPushAttrib(GL_VIEWPORT_BIT | GL_ENABLE_BIT);
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
@@ -633,18 +649,44 @@ static int PostProcessingCallback(XPLMDrawingPhase inPhase, int inIsBefore, void
     glLoadIdentity();
     glViewport(0, 0, x, y);
 
+    int settingsWindowOpen = (g_SettingsWindow && g_SettingsWindow->GetVisible()) ? 1 : 0;
+    float splitFrac = 0.0f;
+    if (settingsWindowOpen && sPreviewMode == PREVIEW_MODE_SPLIT && !sMomentaryFullView) {
+        splitFrac = std::clamp(sPreviewSplitPosition, 0.05f, 0.95f);
+    }
+
     glColor3f(1.0f, 1.0f, 1.0f);
     glBegin(GL_QUADS);
-    int settingsWindowOpen = (g_SettingsWindow && g_SettingsWindow->GetVisible()) ? 1 : 0;
-    glTexCoord2f((!settingsWindowOpen ? 0.0f : 0.5f), 0.0f);
-    glVertex2f((!settingsWindowOpen ? 0.0f : (GLfloat) (x / 2.0f)), 0.0f);
-    glTexCoord2f((!settingsWindowOpen ? 0.0f : 0.5f), 1.0f);
-    glVertex2f((!settingsWindowOpen ? 0.0f : (GLfloat) (x / 2.0f)), (GLfloat) y);
+    glTexCoord2f(splitFrac, 0.0f);
+    glVertex2f((GLfloat)(x * splitFrac), 0.0f);
+    glTexCoord2f(splitFrac, 1.0f);
+    glVertex2f((GLfloat)(x * splitFrac), (GLfloat)y);
     glTexCoord2f(1.0f, 1.0f);
-    glVertex2f((GLfloat) x, (GLfloat) y);
+    glVertex2f((GLfloat)x, (GLfloat)y);
     glTexCoord2f(1.0f, 0.0f);
-    glVertex2f((GLfloat) x, 0.0f);
+    glVertex2f((GLfloat)x, 0.0f);
     glEnd();
+
+    // Optional vertical divider hairline at the split boundary:
+    if (settingsWindowOpen && sPreviewMode == PREVIEW_MODE_SPLIT && !sMomentaryFullView && sShowSplitDivider && splitFrac > 0.01f && splitFrac < 0.99f) {
+        glUseProgram(0);
+        glDisable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        GLfloat divX = (GLfloat)(x * splitFrac);
+        glLineWidth(1.0f);
+        glBegin(GL_LINES);
+        // Soft dark shadow line immediately to the left for contrast against bright scenes:
+        glColor4f(0.0f, 0.0f, 0.0f, 0.35f);
+        glVertex2f(divX - 1.0f, 0.0f);
+        glVertex2f(divX - 1.0f, (GLfloat)y);
+        // Crisp translucent white hairline:
+        glColor4f(1.0f, 1.0f, 1.0f, 0.65f);
+        glVertex2f(divX, 0.0f);
+        glVertex2f(divX, (GLfloat)y);
+        glEnd();
+    }
 
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
@@ -835,6 +877,7 @@ void SetPostProcessingEnabled(bool enabled)
         XPLMRegisterDrawCallback(PostProcessingCallback, xplm_Phase_Window, 1, NULL);
         UpdateRaleighScale(0);
     }
+    UpdatePostProcessingMenuState();
 }
 
 void SetFpsLimiterEnabled(bool enabled)
@@ -995,6 +1038,27 @@ std::string sSessionInitialProfile = "blu_fx.ini";
 std::string sUiMode = "sliders";
 float sUiOpacity = 0.95f;
 int sConfirmOnClose = 1; // 1 = prompt with confirmation dialog when closing with unsaved adjustments; 0 = silently keep in-memory
+int sWindowLeft = -1;
+int sWindowTop = -1;
+int sPreviewMode = PREVIEW_MODE_SPLIT;
+float sPreviewSplitPosition = 0.50f;
+bool sMomentaryFullView = false;
+bool sShowSplitDivider = true;
+
+void SetMomentaryFullView(bool active)
+{
+    if (sMomentaryFullView == active) return;
+    sMomentaryFullView = active;
+    if (!postProcesssingEnabled) {
+        if (sMomentaryFullView) {
+            XPLMRegisterDrawCallback(PostProcessingCallback, xplm_Phase_Window, 1, NULL);
+            UpdateRaleighScale(0);
+        } else {
+            XPLMUnregisterDrawCallback(PostProcessingCallback, xplm_Phase_Window, 1, NULL);
+            UpdateRaleighScale(1);
+        }
+    }
+}
 
 void EnsureProfilesDirectoryExists(void)
 {
@@ -1037,6 +1101,11 @@ bool SavePreferences(void)
     file << "uiMode=" << sUiMode << std::endl;
     file << "uiOpacity=" << std::fixed << std::setprecision(2) << sUiOpacity << std::endl;
     file << "confirmOnClose=" << sConfirmOnClose << std::endl;
+    file << "windowLeft=" << sWindowLeft << std::endl;
+    file << "windowTop=" << sWindowTop << std::endl;
+    file << "previewMode=" << (sPreviewMode == PREVIEW_MODE_FULL ? "full" : "split") << std::endl;
+    file << "previewSplit=" << std::fixed << std::setprecision(2) << sPreviewSplitPosition << std::endl;
+    file << "previewDivider=" << (sShowSplitDivider ? 1 : 0) << std::endl;
     int effectiveMaxFps = (fpsLimiterEnabled && maxFps > 0.0f) ? (int)maxFps : 0;
     file << "maxFps=" << effectiveMaxFps << std::endl;
     file << std::endl;
@@ -1087,6 +1156,18 @@ bool LoadPreferences(void)
             if (sUiOpacity > 1.00f) sUiOpacity = 1.00f;
         } else if (key == "confirmOnClose") {
             iss >> sConfirmOnClose;
+        } else if (key == "windowLeft" || key == "windowX") {
+            iss >> sWindowLeft;
+        } else if (key == "windowTop" || key == "windowY") {
+            iss >> sWindowTop;
+        } else if (key == "previewMode") {
+            sPreviewMode = (val == "full") ? PREVIEW_MODE_FULL : PREVIEW_MODE_SPLIT;
+        } else if (key == "previewSplit") {
+            iss >> sPreviewSplitPosition;
+            if (sPreviewSplitPosition < 0.05f) sPreviewSplitPosition = 0.05f;
+            if (sPreviewSplitPosition > 0.95f) sPreviewSplitPosition = 0.95f;
+        } else if (key == "previewDivider") {
+            iss >> sShowSplitDivider;
         } else if (key == "maxFps") {
             int fps = 0;
             iss >> fps;
@@ -1361,6 +1442,9 @@ void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
 {
     if ((intptr_t) inItemRef == 0) {
         ToggleSettingsWindow();
+    } else if ((intptr_t) inItemRef == 1) {
+        SetPostProcessingEnabled(!postProcesssingEnabled);
+        SavePreferences();
     }
 }
 
@@ -1409,6 +1493,27 @@ int toggleSettingsHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, vo
     return 0;   // 0 = we own and consume this command across all phases
 }
 
+int TogglePostProcessingCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase == xplm_CommandBegin) {
+        SetPostProcessingEnabled(!postProcesssingEnabled);
+        SavePreferences();
+    }
+
+    return 0;
+}
+
+int MomentaryPostProcessingCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase == xplm_CommandBegin) {
+        SetMomentaryFullView(true);
+    } else if (inPhase == xplm_CommandEnd) {
+        SetMomentaryFullView(false);
+    }
+
+    return 0;
+}
+
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 {
     // set plugin info
@@ -1455,22 +1560,34 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // register own dataref
     overrideControlCinemaVeriteDataRef = XPLMRegisterDataAccessor(NAME_LOWERCASE "/override_control_cinema_verite", xplmType_Int,  1, GetOverrideControlCinemaVeriteDataRefCallback, SetOverrideControlCinemaVeriteDataRefCallback,  NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
-    // register our own commandref
+    // register our commands
     g_ToggleSettingsCmd = XPLMCreateCommand(NAME_LOWERCASE "/toggle_settings", "toggle " NAME " settings window open/closed");
     XPLMRegisterCommandHandler(g_ToggleSettingsCmd, toggleSettingsHandler, 1, NULL);
+
+    g_TogglePostProcessingCmd = XPLMCreateCommand(NAME_LOWERCASE "/post_processing/toggle", "toggle " NAME " post-processing on/off");
+    XPLMRegisterCommandHandler(g_TogglePostProcessingCmd, TogglePostProcessingCommandHandler, 1, NULL);
+
+    g_MomentaryPostProcessingCmd = XPLMCreateCommand(NAME_LOWERCASE "/post_processing/momentary", "momentary " NAME " full-screen post-processing preview while held");
+    XPLMRegisterCommandHandler(g_MomentaryPostProcessingCmd, MomentaryPostProcessingCommandHandler, 1, NULL);
     
     // create menu-entries
     int subMenuItem = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 1);
-    XPLMMenuID menu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
+    g_BluFxMenu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
     
     // before adding modern menu option, check to be sure XPLM 301 is available:
-    if (XPLMFindSymbol("XPLMAppendMenuItemWithCommand"))
-        XPLMAppendMenuItemWithCommand(menu, "Settings", g_ToggleSettingsCmd);
-    else
-        XPLMAppendMenuItem(menu, "Settings", NULL, 1);
+    if (XPLMFindSymbol("XPLMAppendMenuItemWithCommand")) {
+        XPLMAppendMenuItemWithCommand(g_BluFxMenu, "Settings window", g_ToggleSettingsCmd);
+        g_TogglePostProcessingMenuItemIdx = XPLMAppendMenuItemWithCommand(g_BluFxMenu, "Post-processing", g_TogglePostProcessingCmd);
+    } else {
+        XPLMAppendMenuItem(g_BluFxMenu, "Settings window", (void*)0, 1);
+        g_TogglePostProcessingMenuItemIdx = XPLMAppendMenuItem(g_BluFxMenu, "Post-processing", (void*)1, 1);
+    }
 
     // read and apply config file
     LoadSettings();
+
+    // sync menu check indicator with loaded post-processing preference:
+    UpdatePostProcessingMenuState();
 
     return 1;
 }
@@ -1480,6 +1597,19 @@ PLUGIN_API void XPluginStop(void)
     if (g_ToggleSettingsCmd) {
         XPLMUnregisterCommandHandler(g_ToggleSettingsCmd, toggleSettingsHandler, 1, NULL);
         g_ToggleSettingsCmd = NULL;
+    }
+    if (g_TogglePostProcessingCmd) {
+        XPLMUnregisterCommandHandler(g_TogglePostProcessingCmd, TogglePostProcessingCommandHandler, 1, NULL);
+        g_TogglePostProcessingCmd = NULL;
+    }
+    if (g_MomentaryPostProcessingCmd) {
+        XPLMUnregisterCommandHandler(g_MomentaryPostProcessingCmd, MomentaryPostProcessingCommandHandler, 1, NULL);
+        g_MomentaryPostProcessingCmd = NULL;
+    }
+    if (g_BluFxMenu) {
+        XPLMDestroyMenu(g_BluFxMenu);
+        g_BluFxMenu = NULL;
+        g_TogglePostProcessingMenuItemIdx = -1;
     }
 
     // (Note: Removed auto-save on exit so user settings are only saved under explicit user control)
