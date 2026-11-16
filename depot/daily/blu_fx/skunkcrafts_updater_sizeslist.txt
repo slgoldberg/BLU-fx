@@ -1,0 +1,5 @@
+README.txt|7573
+Version.txt|58
+lin_x64/blu_fx.xpl|675824
+mac_x64/blu_fx.xpl|1309264
+win_x64/blu_fx.xpl|2851827
