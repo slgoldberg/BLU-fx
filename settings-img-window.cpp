@@ -1575,24 +1575,35 @@ void SettingsImgWindow::buildInterface()
     ImGui::EndGroup();
 
     // ------------------------------------------------------------------------
-    // Compatibility & Downgrade Safety Option
+    // Compatibility & Downgrade Safety Option (Compact Muted Footer)
     // ------------------------------------------------------------------------
-    ImGui::Spacing();
     ImGui::Separator();
-    bool mirrorLegacy = (sMirrorLegacyIni != 0);
-    if (ImGui::Checkbox("Mirror to legacy blu_fx.ini (v1.x downgrade safety)", &mirrorLegacy)) {
-        sMirrorLegacyIni = mirrorLegacy ? 1 : 0;
+    if (IM_SMALLER_FONT) ImGui::PushFont(IM_SMALLER_FONT);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.64f, 0.72f, 0.75f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 1.0f));
+
+    bool disableMirror = (sMirrorLegacyIni == 0);
+    if (ImGui::Checkbox("I will never return to v1; remove backwards-compatibility hacks.", &disableMirror)) {
+        sMirrorLegacyIni = disableMirror ? 0 : 1;
         SavePreferences();
         if (sMirrorLegacyIni) {
             SyncLegacyIniMirror();
         }
     }
-    ImGui::TimedTooltip::TextMD(
-        "**Legacy Downgrade Mirroring:**\n"
-        "Automatically writes active color grading settings to `Resources/plugins/blu_fx/blu_fx.ini`.\n\n"
-        "If you ever switch back or downgrade to BLU-fx v1.x (via SkunkCrafts Updater or manual archive),\n"
-        "v1.x will seamlessly pick up your latest color grading adjustments."
+    ImGui::TimedTooltip::TextMD(disableMirror
+        ? "**Legacy Downgrade Compatibility: DISABLED**\n"
+          "BLU-fx will no longer update `blu_fx.ini` in the plugin root.\n\n"
+          "*(Uncheck this box to re-enable automatic v1.x downgrade protection)*"
+        : "**Legacy Downgrade Compatibility: ACTIVE**\n"
+          "BLU-fx automatically mirrors active color adjustments into `blu_fx.ini`.\n\n"
+          "If you ever roll back to v1.x (via SkunkCrafts Updater or manual archive),\n"
+          "v1.x will seamlessly pick up your latest color grading adjustments.\n\n"
+          "*(Check this box only if you will never return to v1.x)*"
     );
+
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
+    if (IM_SMALLER_FONT) ImGui::PopFont();
 
     // ------------------------------------------------------------------------
     // Legacy XP11 Sections (Raleigh Scale, FPS-Limiter, Cinema Verite)

@@ -47,7 +47,8 @@ HIGHLIGHTS FOR THIS RELEASE (v2.0.0b1):
       blu_fx.ini file whenever adjustments or profiles are saved.
     - If you ever downgrade or switch back to v1.x, your latest color grading
       settings remain fully intact and immediately accessible.
-    - Can be toggled off at any time via a dedicated checkbox in the Settings window.
+    - Optional opt-out checkbox in Settings footer if you want to turn off
+      legacy file updates completely.
 
 ===============================================================================
 HISTORICAL RELEASE NOTES:
