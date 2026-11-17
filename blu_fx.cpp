@@ -1485,12 +1485,18 @@ void LoadSettings(void)
         BLUfxPresets[PRESET_USER].disableCinemaVeriteTime = disableCinemaVeriteTime;
     }
 
-    // Downgrade mirror self-healing: ensure root blu_fx.ini exists if mirroring is active
+    // Downgrade mirror management: ensure root blu_fx.ini exists if mirroring is active,
+    // or remove it if user opted out of backward compatibility:
     if (sMirrorLegacyIni) {
         struct stat stRoot;
         if (stat(CONFIG_PATH, &stRoot) != 0) {
             SyncLegacyIniMirror();
             XPLMDebugString("Blu-FX: Materialized missing root blu_fx.ini from active startup profile for downgrade safety\n");
+        }
+    } else {
+        struct stat stRoot;
+        if (stat(CONFIG_PATH, &stRoot) == 0) {
+            remove(CONFIG_PATH);
         }
     }
 

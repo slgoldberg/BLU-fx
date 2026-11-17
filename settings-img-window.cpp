@@ -1592,6 +1592,8 @@ void SettingsImgWindow::buildInterface()
         SavePreferences();
         if (sMirrorLegacyIni) {
             SyncLegacyIniMirror();
+        } else {
+            std::remove(CONFIG_PATH);
         }
     }
 
