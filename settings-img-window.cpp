@@ -1603,7 +1603,7 @@ void SettingsImgWindow::buildInterface()
     ImGui::TimedTooltip::TextMD(disableMirror
         ? "**Legacy Downgrade Compatibility: DISABLED**\n"
           "BLU-fx will no longer update `blu_fx.ini` in the plugin root.\n\n"
-          "*(Uncheck this box to re-enable automatic v1.x downgrade protection.)*"
+          "*(Unchecking this box will re-enable automatic v1.x downgrade protection.)*"
         : "**Legacy Downgrade Compatibility: ACTIVE**\n"
           "BLU-fx automatically mirrors active color grading into `blu_fx.ini`.\n\n"
           "If you roll back to v1.x (via SkunkCrafts Updater or manual archive), "
