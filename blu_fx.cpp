@@ -50,9 +50,9 @@
 #include "XPLMProcessing.h"
 #include "XPLMUtilities.h"
 
-#include <fstream>
-#include <sstream>
-#include <iomanip>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -1126,122 +1126,132 @@ bool SavePreferences(void)
 {
     EnsurePreferencesDirectoryExists();
     std::string path = GetPrefsFilePath();
-    std::fstream file;
-    file.open(path.c_str(), std::ios_base::out | std::ios_base::trunc);
-    if (!file.is_open()) return false;
+    FILE* fp = fopen(path.c_str(), "w");
+    if (!fp) return false;
 
-    file << "# Blu-FX Application Preferences" << std::endl;
-    file << "startupProfile=" << sStartupActiveProfile << std::endl;
-    file << "activeProfile=" << sStartupActiveProfile << std::endl;
-    file << "postProcessingEnabled=" << postProcesssingEnabled << std::endl;
-    file << "uiMode=" << sUiMode << std::endl;
-    file << "uiOpacity=" << std::fixed << std::setprecision(2) << sUiOpacity << std::endl;
-    file << "confirmOnClose=" << sConfirmOnClose << std::endl;
-    file << "mirrorLegacyIni=" << sMirrorLegacyIni << std::endl;
-    file << "windowLeft=" << sWindowLeft << std::endl;
-    file << "windowTop=" << sWindowTop << std::endl;
+    fprintf(fp, "# Blu-FX Application Preferences\n");
+    fprintf(fp, "startupProfile=%s\n", sStartupActiveProfile.c_str());
+    fprintf(fp, "activeProfile=%s\n", sStartupActiveProfile.c_str());
+    fprintf(fp, "postProcessingEnabled=%d\n", postProcesssingEnabled);
+    fprintf(fp, "uiMode=%s\n", sUiMode.c_str());
+    fprintf(fp, "uiOpacity=%.2f\n", sUiOpacity);
+    fprintf(fp, "confirmOnClose=%d\n", sConfirmOnClose);
+    fprintf(fp, "mirrorLegacyIni=%d\n", sMirrorLegacyIni);
+    fprintf(fp, "windowLeft=%d\n", sWindowLeft);
+    fprintf(fp, "windowTop=%d\n", sWindowTop);
     if (sDocViewerLeft >= 0 && sDocViewerTop >= 0 && sDocViewerWidth >= 480 && sDocViewerHeight >= 300) {
-        file << "docViewerLeft=" << sDocViewerLeft << std::endl;
-        file << "docViewerTop=" << sDocViewerTop << std::endl;
-        file << "docViewerWidth=" << sDocViewerWidth << std::endl;
-        file << "docViewerHeight=" << sDocViewerHeight << std::endl;
-        file << "docViewerZoom=" << std::fixed << std::setprecision(2) << sDocViewerZoom << std::endl;
+        fprintf(fp, "docViewerLeft=%d\n", sDocViewerLeft);
+        fprintf(fp, "docViewerTop=%d\n", sDocViewerTop);
+        fprintf(fp, "docViewerWidth=%d\n", sDocViewerWidth);
+        fprintf(fp, "docViewerHeight=%d\n", sDocViewerHeight);
+        fprintf(fp, "docViewerZoom=%.2f\n", sDocViewerZoom);
     }
-    file << "previewMode=" << (sPreviewMode == PREVIEW_MODE_FULL ? "full" : "split") << std::endl;
-    file << "previewSplit=" << std::fixed << std::setprecision(2) << sPreviewSplitPosition << std::endl;
-    file << "previewDivider=" << (sShowSplitDivider ? 1 : 0) << std::endl;
+    fprintf(fp, "previewMode=%s\n", (sPreviewMode == PREVIEW_MODE_FULL ? "full" : "split"));
+    fprintf(fp, "previewSplit=%.2f\n", sPreviewSplitPosition);
+    fprintf(fp, "previewDivider=%d\n", (sShowSplitDivider ? 1 : 0));
     int effectiveMaxFps = (fpsLimiterEnabled && maxFps > 0.0f) ? (int)maxFps : 0;
-    file << "maxFps=" << effectiveMaxFps << std::endl;
-    file << std::endl;
-    file << "# Legacy Camera Settings (X-Plane 11)" << std::endl;
-    file << "cinemaVeriteEnabled=" << controlCinemaVeriteEnabled << std::endl;
-    file << "cinemaVeriteDisableTime=" << std::fixed << std::setprecision(1) << disableCinemaVeriteTime << std::endl;
+    fprintf(fp, "maxFps=%d\n", effectiveMaxFps);
+    fprintf(fp, "\n# Legacy Camera Settings (X-Plane 11)\n");
+    fprintf(fp, "cinemaVeriteEnabled=%d\n", controlCinemaVeriteEnabled);
+    fprintf(fp, "cinemaVeriteDisableTime=%.1f\n", disableCinemaVeriteTime);
 
-    file.close();
+    fclose(fp);
     return true;
 }
 
 bool LoadPreferences(void)
 {
     std::string path = GetPrefsFilePath();
-    std::ifstream file;
-    file.open(path.c_str());
-    if (!file.is_open()) return false;
+    FILE* fp = fopen(path.c_str(), "r");
+    if (!fp) return false;
 
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '#' || line[0] == ';') continue;
-        size_t eq = line.find('=');
-        if (eq == std::string::npos) continue;
+    char lineBuf[1024];
+    while (fgets(lineBuf, sizeof(lineBuf), fp)) {
+        char* p = lineBuf;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '\0' || *p == '#' || *p == ';' || *p == '\r' || *p == '\n') continue;
 
-        std::string key = line.substr(0, eq);
-        std::string val = line.substr(eq + 1);
+        char* eq = strchr(p, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        char* key = p;
+        char* val = eq + 1;
 
-        while (!key.empty() && (key.back() == ' ' || key.back() == '\t' || key.back() == '\r')) key.pop_back();
-        while (!val.empty() && (val.front() == ' ' || val.front() == '\t')) val.erase(0, 1);
-        while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\r')) val.pop_back();
+        // Trim key trailing whitespace:
+        char* endKey = key + strlen(key) - 1;
+        while (endKey >= key && (*endKey == ' ' || *endKey == '\t' || *endKey == '\r' || *endKey == '\n')) {
+            *endKey = '\0';
+            endKey--;
+        }
 
-        std::istringstream iss(val);
-        if (key == "startupProfile") {
+        // Trim val leading whitespace:
+        while (*val == ' ' || *val == '\t') val++;
+        // Trim val trailing whitespace:
+        char* endVal = val + strlen(val) - 1;
+        while (endVal >= val && (*endVal == ' ' || *endVal == '\t' || *endVal == '\r' || *endVal == '\n')) {
+            *endVal = '\0';
+            endVal--;
+        }
+
+        if (strcmp(key, "startupProfile") == 0) {
             sStartupActiveProfile = val;
             sActiveProfileName = val;
-        } else if (key == "activeProfile") {
+        } else if (strcmp(key, "activeProfile") == 0) {
             if (sStartupActiveProfile.empty() || sStartupActiveProfile == "blu_fx.ini") {
                 sStartupActiveProfile = val;
                 sActiveProfileName = val;
             }
-        } else if (key == "postProcessingEnabled" || key == "postProcesssingEnabled") {
-            iss >> postProcesssingEnabled;
-        } else if (key == "uiMode") {
+        } else if (strcmp(key, "postProcessingEnabled") == 0 || strcmp(key, "postProcesssingEnabled") == 0) {
+            postProcesssingEnabled = atoi(val);
+        } else if (strcmp(key, "uiMode") == 0) {
             sUiMode = val;
-        } else if (key == "uiOpacity") {
-            iss >> sUiOpacity;
+        } else if (strcmp(key, "uiOpacity") == 0) {
+            sUiOpacity = (float)atof(val);
             if (sUiOpacity < 0.20f) sUiOpacity = 0.20f;
             if (sUiOpacity > 1.00f) sUiOpacity = 1.00f;
-        } else if (key == "confirmOnClose") {
-            iss >> sConfirmOnClose;
-        } else if (key == "mirrorLegacyIni") {
-            iss >> sMirrorLegacyIni;
-        } else if (key == "windowLeft" || key == "windowX") {
-            iss >> sWindowLeft;
-        } else if (key == "windowTop" || key == "windowY") {
-            iss >> sWindowTop;
-        } else if (key == "docViewerLeft") {
-            iss >> sDocViewerLeft;
-        } else if (key == "docViewerTop") {
-            iss >> sDocViewerTop;
-        } else if (key == "docViewerWidth") {
-            iss >> sDocViewerWidth;
-        } else if (key == "docViewerHeight") {
-            iss >> sDocViewerHeight;
-        } else if (key == "docViewerZoom") {
-            iss >> sDocViewerZoom;
+        } else if (strcmp(key, "confirmOnClose") == 0) {
+            sConfirmOnClose = atoi(val);
+        } else if (strcmp(key, "mirrorLegacyIni") == 0) {
+            sMirrorLegacyIni = atoi(val);
+        } else if (strcmp(key, "windowLeft") == 0 || strcmp(key, "windowX") == 0) {
+            sWindowLeft = atoi(val);
+        } else if (strcmp(key, "windowTop") == 0 || strcmp(key, "windowY") == 0) {
+            sWindowTop = atoi(val);
+        } else if (strcmp(key, "docViewerLeft") == 0) {
+            sDocViewerLeft = atoi(val);
+        } else if (strcmp(key, "docViewerTop") == 0) {
+            sDocViewerTop = atoi(val);
+        } else if (strcmp(key, "docViewerWidth") == 0) {
+            sDocViewerWidth = atoi(val);
+        } else if (strcmp(key, "docViewerHeight") == 0) {
+            sDocViewerHeight = atoi(val);
+        } else if (strcmp(key, "docViewerZoom") == 0) {
+            sDocViewerZoom = (float)atof(val);
             if (sDocViewerZoom < 0.50f) sDocViewerZoom = 0.50f;
             if (sDocViewerZoom > 2.00f) sDocViewerZoom = 2.00f;
-        } else if (key == "previewMode") {
-            sPreviewMode = (val == "full") ? PREVIEW_MODE_FULL : PREVIEW_MODE_SPLIT;
-        } else if (key == "previewSplit") {
-            iss >> sPreviewSplitPosition;
+        } else if (strcmp(key, "previewMode") == 0) {
+            sPreviewMode = (strcmp(val, "full") == 0) ? PREVIEW_MODE_FULL : PREVIEW_MODE_SPLIT;
+        } else if (strcmp(key, "previewSplit") == 0) {
+            sPreviewSplitPosition = (float)atof(val);
             if (sPreviewSplitPosition < 0.05f) sPreviewSplitPosition = 0.05f;
             if (sPreviewSplitPosition > 0.95f) sPreviewSplitPosition = 0.95f;
-        } else if (key == "previewDivider") {
-            iss >> sShowSplitDivider;
-        } else if (key == "maxFps") {
-            int fps = 0;
-            iss >> fps;
+        } else if (strcmp(key, "previewDivider") == 0) {
+            sShowSplitDivider = (atoi(val) != 0);
+        } else if (strcmp(key, "maxFps") == 0) {
+            int fps = atoi(val);
             if (fps > 0) {
                 fpsLimiterEnabled = 1;
                 maxFps = (float)fps;
             } else {
                 fpsLimiterEnabled = 0;
             }
-        } else if (key == "cinemaVeriteEnabled") {
-            iss >> controlCinemaVeriteEnabled;
-        } else if (key == "cinemaVeriteDisableTime") {
-            iss >> disableCinemaVeriteTime;
+        } else if (strcmp(key, "cinemaVeriteEnabled") == 0) {
+            controlCinemaVeriteEnabled = atoi(val);
+        } else if (strcmp(key, "cinemaVeriteDisableTime") == 0) {
+            disableCinemaVeriteTime = (float)atof(val);
         }
     }
-    file.close();
+    fclose(fp);
     return true;
 }
 
@@ -1292,59 +1302,53 @@ void SyncLegacyIniMirror(void)
 {
     if (!sMirrorLegacyIni) return;
 
-    std::fstream legFile;
-    legFile.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
-    if (legFile.is_open()) {
-        legFile << "# BLU-fx v1.x Legacy Mirror (Auto-generated from active profile: " << (sActiveProfileName.empty() ? "Custom" : sActiveProfileName) << ")" << std::endl;
-        legFile << "brightness=" << std::fixed << std::setprecision(2) << brightness << std::endl;
-        legFile << "contrast=" << std::fixed << std::setprecision(2) << contrast << std::endl;
-        legFile << "saturation=" << std::fixed << std::setprecision(2) << saturation << std::endl;
-        legFile << "redScale=" << std::fixed << std::setprecision(2) << redScale << std::endl;
-        legFile << "greenScale=" << std::fixed << std::setprecision(2) << greenScale << std::endl;
-        legFile << "blueScale=" << std::fixed << std::setprecision(2) << blueScale << std::endl;
-        legFile << "redOffset=" << std::fixed << std::setprecision(2) << redOffset << std::endl;
-        legFile << "greenOffset=" << std::fixed << std::setprecision(2) << greenOffset << std::endl;
-        legFile << "blueOffset=" << std::fixed << std::setprecision(2) << blueOffset << std::endl;
-        legFile << "vignette=" << std::fixed << std::setprecision(2) << vignette << std::endl;
-        legFile << "raleighScale=" << std::fixed << std::setprecision(1) << raleighScale << std::endl;
-        legFile << "maxFps=" << (int)maxFps << std::endl;
-        legFile << "cinemaVeriteEnabled=" << controlCinemaVeriteEnabled << std::endl;
-        legFile << "cinemaVeriteDisableTime=" << std::fixed << std::setprecision(1) << disableCinemaVeriteTime << std::endl;
-        legFile.close();
-    }
+    FILE* fp = fopen(CONFIG_PATH, "w");
+    if (!fp) return;
+
+    fprintf(fp, "# BLU-fx v1.x Legacy Mirror (Auto-generated from active profile: %s)\n", (sActiveProfileName.empty() ? "Custom" : sActiveProfileName.c_str()));
+    fprintf(fp, "brightness=%.2f\n", brightness);
+    fprintf(fp, "contrast=%.2f\n", contrast);
+    fprintf(fp, "saturation=%.2f\n", saturation);
+    fprintf(fp, "redScale=%.2f\n", redScale);
+    fprintf(fp, "greenScale=%.2f\n", greenScale);
+    fprintf(fp, "blueScale=%.2f\n", blueScale);
+    fprintf(fp, "redOffset=%.2f\n", redOffset);
+    fprintf(fp, "greenOffset=%.2f\n", greenOffset);
+    fprintf(fp, "blueOffset=%.2f\n", blueOffset);
+    fprintf(fp, "vignette=%.2f\n", vignette);
+    fprintf(fp, "raleighScale=%.1f\n", raleighScale);
+    fprintf(fp, "maxFps=%d\n", (int)maxFps);
+    fprintf(fp, "cinemaVeriteEnabled=%d\n", controlCinemaVeriteEnabled);
+    fprintf(fp, "cinemaVeriteDisableTime=%.1f\n", disableCinemaVeriteTime);
+    fclose(fp);
 }
 
 // saves current color grading adjustments to a specified profile file
 bool SaveSettingsToFile(const std::string& path)
 {
     EnsureProfilesDirectoryExists();
-    std::fstream file;
-    file.open(path.c_str(), std::ios_base::out | std::ios_base::trunc);
+    FILE* fp = fopen(path.c_str(), "w");
+    if (!fp) return false;
 
-    if (file.is_open())
-    {
-        file << "brightness=" << std::fixed << std::setprecision(2) << brightness << std::endl;
-        file << "contrast=" << std::fixed << std::setprecision(2) << contrast << std::endl;
-        file << "saturation=" << std::fixed << std::setprecision(2) << saturation << std::endl;
-        file << "redScale=" << std::fixed << std::setprecision(2) << redScale << std::endl;
-        file << "greenScale=" << std::fixed << std::setprecision(2) << greenScale << std::endl;
-        file << "blueScale=" << std::fixed << std::setprecision(2) << blueScale << std::endl;
-        file << "redOffset=" << std::fixed << std::setprecision(2) << redOffset << std::endl;
-        file << "greenOffset=" << std::fixed << std::setprecision(2) << greenOffset << std::endl;
-        file << "blueOffset=" << std::fixed << std::setprecision(2) << blueOffset << std::endl;
-        file << "vignette=" << std::fixed << std::setprecision(2) << vignette << std::endl;
-        file << "raleighScale=" << std::fixed << std::setprecision(1) << raleighScale << std::endl;
+    fprintf(fp, "brightness=%.2f\n", brightness);
+    fprintf(fp, "contrast=%.2f\n", contrast);
+    fprintf(fp, "saturation=%.2f\n", saturation);
+    fprintf(fp, "redScale=%.2f\n", redScale);
+    fprintf(fp, "greenScale=%.2f\n", greenScale);
+    fprintf(fp, "blueScale=%.2f\n", blueScale);
+    fprintf(fp, "redOffset=%.2f\n", redOffset);
+    fprintf(fp, "greenOffset=%.2f\n", greenOffset);
+    fprintf(fp, "blueOffset=%.2f\n", blueOffset);
+    fprintf(fp, "vignette=%.2f\n", vignette);
+    fprintf(fp, "raleighScale=%.1f\n", raleighScale);
+    fclose(fp);
 
-        file.close();
-
-        // Optional legacy mirror to root blu_fx.ini for v1.x downgrade safety:
-        if (sMirrorLegacyIni && path != CONFIG_PATH) {
-            SyncLegacyIniMirror();
-        }
-
-        return true;
+    // Optional legacy mirror to root blu_fx.ini for v1.x downgrade safety:
+    if (sMirrorLegacyIni && path != CONFIG_PATH) {
+        SyncLegacyIniMirror();
     }
-    return false;
+
+    return true;
 }
 
 // loads color grading adjustments from a specified file (profile or legacy)
@@ -1352,67 +1356,58 @@ bool LoadSettingsFromFile(const std::string& path)
 {
     ClearPrePresetScratchpad();
 
-    std::ifstream file;
-    file.open(path.c_str());
+    FILE* fp = fopen(path.c_str(), "r");
+    if (!fp) return false;
 
-    if(file.is_open())
-    {
-        std::string line;
+    char lineBuf[1024];
+    while (fgets(lineBuf, sizeof(lineBuf), fp)) {
+        char* p = lineBuf;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '\0' || *p == '#' || *p == ';' || *p == '\r' || *p == '\n') continue;
 
-        while(getline(file, line))
-        {
-            if (line.empty() || line[0] == '#' || line[0] == ';') continue;
-            size_t eq = line.find('=');
-            if (eq == std::string::npos) continue;
+        char* eq = strchr(p, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        char* key = p;
+        char* val = eq + 1;
 
-            std::string key = line.substr(0, eq);
-            std::string val = line.substr(eq + 1);
-
-            while (!key.empty() && (key.back() == ' ' || key.back() == '\t' || key.back() == '\r')) key.pop_back();
-            while (!val.empty() && (val.front() == ' ' || val.front() == '\t')) val.erase(0, 1);
-            while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\r')) val.pop_back();
-
-            std::istringstream iss(val);
-
-            if(key == "brightness")
-                iss >> brightness;
-            else if(key == "contrast")
-                iss >> contrast;
-            else if(key == "saturation")
-                iss >> saturation;
-            else if(key == "redScale")
-                iss >> redScale;
-            else if(key == "greenScale")
-                iss >> greenScale;
-            else if(key == "blueScale")
-                iss >> blueScale;
-            else if(key == "redOffset")
-                iss >> redOffset;
-            else if(key == "greenOffset")
-                iss >> greenOffset;
-            else if(key == "blueOffset")
-                iss >> blueOffset;
-            else if(key == "vignette")
-                iss >> vignette;
-            else if(key == "raleighScale")
-                iss >> raleighScale;
-            else if(key == "postProcesssingEnabled" || key == "postProcessingEnabled")
-                iss >> postProcesssingEnabled;
-            else if(key == "fpsLimiterEnabled")
-                iss >> fpsLimiterEnabled;
-            else if(key == "controlCinemaVeriteEnabled" || key == "cinemaVeriteEnabled")
-                iss >> controlCinemaVeriteEnabled;
-            else if(key == "maxFps")
-                iss >> maxFps;
-            else if(key == "disableCinemaVeriteTime" || key == "cinemaVeriteDisableTime")
-                iss >> disableCinemaVeriteTime;
+        // Trim key trailing whitespace:
+        char* endKey = key + strlen(key) - 1;
+        while (endKey >= key && (*endKey == ' ' || *endKey == '\t' || *endKey == '\r' || *endKey == '\n')) {
+            *endKey = '\0';
+            endKey--;
         }
 
-        file.close();
-        UpdateRaleighScale(0);
-        return true;
+        // Trim val leading whitespace:
+        while (*val == ' ' || *val == '\t') val++;
+        // Trim val trailing whitespace:
+        char* endVal = val + strlen(val) - 1;
+        while (endVal >= val && (*endVal == ' ' || *endVal == '\t' || *endVal == '\r' || *endVal == '\n')) {
+            *endVal = '\0';
+            endVal--;
+        }
+
+        if (strcmp(key, "brightness") == 0) brightness = (float)atof(val);
+        else if (strcmp(key, "contrast") == 0) contrast = (float)atof(val);
+        else if (strcmp(key, "saturation") == 0) saturation = (float)atof(val);
+        else if (strcmp(key, "redScale") == 0) redScale = (float)atof(val);
+        else if (strcmp(key, "greenScale") == 0) greenScale = (float)atof(val);
+        else if (strcmp(key, "blueScale") == 0) blueScale = (float)atof(val);
+        else if (strcmp(key, "redOffset") == 0) redOffset = (float)atof(val);
+        else if (strcmp(key, "greenOffset") == 0) greenOffset = (float)atof(val);
+        else if (strcmp(key, "blueOffset") == 0) blueOffset = (float)atof(val);
+        else if (strcmp(key, "vignette") == 0) vignette = (float)atof(val);
+        else if (strcmp(key, "raleighScale") == 0) raleighScale = (float)atof(val);
+        else if (strcmp(key, "postProcesssingEnabled") == 0 || strcmp(key, "postProcessingEnabled") == 0) postProcesssingEnabled = atoi(val);
+        else if (strcmp(key, "fpsLimiterEnabled") == 0) fpsLimiterEnabled = atoi(val);
+        else if (strcmp(key, "controlCinemaVeriteEnabled") == 0 || strcmp(key, "cinemaVeriteEnabled") == 0) controlCinemaVeriteEnabled = atoi(val);
+        else if (strcmp(key, "maxFps") == 0) maxFps = (float)atof(val);
+        else if (strcmp(key, "disableCinemaVeriteTime") == 0 || strcmp(key, "cinemaVeriteDisableTime") == 0) disableCinemaVeriteTime = (float)atof(val);
     }
-    return false;
+
+    fclose(fp);
+    UpdateRaleighScale(0);
+    return true;
 }
 
 // saves current settings to active profile in profiles/ and updates blu_fx.prf
@@ -1605,6 +1600,9 @@ int MomentaryPostProcessingCommandHandler(XPLMCommandRef inCommand, XPLMCommandP
 
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 {
+    // Force native POSIX paths on macOS (no Carbon colons):
+    XPLMEnableFeature("XPLM_USE_NATIVE_PATHS", 1);
+
     // set plugin info
     strcpy(outName, NAME_VERSION);
     strcpy(outSig, "de.bwravencl." NAME_LOWERCASE); // TODO: new signature?

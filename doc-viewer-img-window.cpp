@@ -9,8 +9,7 @@
 #include "ImgWindow/contrib/ImGee/imgee_stbi_internal.h"
 #include "ImgWindow/contrib/ImGee/extensions/Markdown/imgui_markdown_image_service.h"
 
-#include <fstream>
-#include <sstream>
+#include <cstdio>
 #include <sys/stat.h>
 #include <algorithm>
 #include <cmath>
@@ -697,13 +696,22 @@ void DocViewerImgWindow::loadDocument()
     }
 
     if (!mDocumentPath.empty()) {
-        std::ifstream file(mDocumentPath.c_str());
-        if (file.is_open()) {
-            std::stringstream buffer;
-            buffer << file.rdbuf();
-            mContent = PreprocessMarkdownAlerts(buffer.str());
-            mLoaded = true;
-            return;
+        FILE* fp = fopen(mDocumentPath.c_str(), "rb");
+        if (fp) {
+            fseek(fp, 0, SEEK_END);
+            long sz = ftell(fp);
+            fseek(fp, 0, SEEK_SET);
+            if (sz > 0) {
+                std::string buf;
+                buf.resize(sz);
+                size_t readBytes = fread(&buf[0], 1, sz, fp);
+                buf.resize(readBytes);
+                mContent = PreprocessMarkdownAlerts(buf);
+                mLoaded = true;
+                fclose(fp);
+                return;
+            }
+            fclose(fp);
         }
     }
 
