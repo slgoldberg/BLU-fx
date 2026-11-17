@@ -5,6 +5,7 @@ TARGET		:= blu_fx
 SOURCES = \
 	blu_fx.cpp \
 	settings-img-window.cpp \
+	doc-viewer-img-window.cpp \
 	ImGui/imgui.cpp \
 	ImGui/imgui_demo.cpp \
 	ImGui/imgui_draw.cpp \

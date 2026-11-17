@@ -4,7 +4,10 @@ xcuserdata
 *.xcworkspace
 build
 build-*
-Release
+# Release packaging
+release/*.zip
+release/blu_fx/*/*.xpl
+release/blu_fx/*_x64/
 SDK_prev
 ipch
 *.suo

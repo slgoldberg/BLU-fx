@@ -1,0 +1,240 @@
+name: "SkunkCrafts: Publish latest build..."
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Depot publish action(s) and channel(s)'
+        required: true
+        default: 'Publish to daily only'
+        type: choice
+        options:
+          - 'Publish to daily only'
+          - 'Publish to beta only (keep release as-is)'
+          - 'Publish to release only (keep beta as-is)'
+          - 'Promote beta->release, then publish to beta'
+          - 'Publish to BOTH beta AND release'
+      create_release:
+        description: 'Tag for release history (creates/updates tag & GitHub Release)'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce master branch only
+        run: |
+          if [[ "${{ github.ref }}" != "refs/heads/master" ]]; then
+            echo "::error::SkunkCrafts depot workflows may only be run from the 'master' branch (current ref: ${{ github.ref }})."
+            exit 1
+          fi
+
+      - name: Checkout master source
+        uses: actions/checkout@v4
+
+      - name: Validate VERSION before building
+        run: |
+          BLUFX_VER=$(grep '#define VERSION' blu_fx.h | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          if [[ -z "$BLUFX_VER" ]]; then
+            echo "::error::Could not parse VERSION from blu_fx.h -- aborting before build or depot changes."
+            exit 1
+          fi
+          echo "Validated VERSION: $BLUFX_VER"
+
+      - name: Verify gh-pages beta exists when promoting first
+        if: inputs.action == 'Promote beta->release, then publish to beta'
+        run: |
+          git fetch origin gh-pages:refs/remotes/origin/gh-pages || {
+            echo "::error::Branch 'gh-pages' does not exist yet -- cannot promote existing beta."
+            exit 1
+          }
+          if ! git cat-file -e origin/gh-pages:depot/beta/blu_fx/skunkcrafts_updater_config.txt 2>/dev/null; then
+            echo "::error::depot/beta/blu_fx/skunkcrafts_updater_config.txt not found on gh-pages -- cannot promote existing beta."
+            exit 1
+          fi
+
+  build:
+    needs: [preflight]
+    uses: ./.github/workflows/cmake.yml
+
+  publish:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure target binary directories exist
+        run: |
+          mkdir -p build-lin/lin_x64 build-win/win_x64 build/mac_x64
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-lin
+          path: build-lin/lin_x64
+
+      - name: Download Windows binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-win
+          path: build-win/win_x64
+
+      - name: Download Mac binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-mac
+          path: build/mac_x64
+
+      - name: Stage & stamp SkunkCrafts depot payload(s)
+        env:
+          BLUFX_VERSION: ${{ needs.build.outputs.blufx_version }}
+          PUBLISH_ACTION: ${{ inputs.action }}
+        run: |
+          chmod +x deploy/stage.sh deploy/xpdepot.py
+          case "$PUBLISH_ACTION" in
+            "Publish to daily only")
+              ./deploy/stage.sh daily --build-depot
+              ;;
+            "Publish to beta only (keep release as-is)"|"Promote beta->release, then publish to beta")
+              ./deploy/stage.sh beta --build-depot
+              ;;
+            "Publish to release only (keep beta as-is)")
+              ./deploy/stage.sh release --build-depot
+              ;;
+            "Publish to BOTH beta AND release")
+              ./deploy/stage.sh all --build-depot
+              ;;
+            *)
+              echo "::error::Unknown publish action: $PUBLISH_ACTION"
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout gh-pages depot branch
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages
+            git worktree add gh-pages-tree origin/gh-pages
+            git -C gh-pages-tree checkout -B gh-pages origin/gh-pages
+          else
+            git worktree add --detach gh-pages-tree
+            git -C gh-pages-tree checkout --orphan gh-pages
+            git -C gh-pages-tree rm -rf . >/dev/null 2>&1 || true
+            touch gh-pages-tree/.nojekyll
+          fi
+
+      - name: Apply atomic depot update & push gh-pages
+        env:
+          BLUFX_VERSION: ${{ needs.build.outputs.blufx_version }}
+          PUBLISH_ACTION: ${{ inputs.action }}
+        run: |
+          STAGE_DEPOT_ROOT="$PWD/build/depot/depot"
+          cd gh-pages-tree
+
+          DAILY_DIR="depot/daily/blu_fx"
+          BETA_DIR="depot/beta/blu_fx"
+          REL_DIR="depot/release/blu_fx"
+          mkdir -p depot/daily depot/beta depot/release
+
+          case "$PUBLISH_ACTION" in
+            "Publish to daily only")
+              rm -rf "$DAILY_DIR"
+              cp -a "$STAGE_DEPOT_ROOT/daily/blu_fx" "$DAILY_DIR"
+              COMMIT_MSG="chore(depot): publish ${BLUFX_VERSION} to daily"
+              ;;
+
+            "Publish to beta only (keep release as-is)")
+              rm -rf "$BETA_DIR"
+              cp -a "$STAGE_DEPOT_ROOT/beta/blu_fx" "$BETA_DIR"
+              COMMIT_MSG="chore(depot): publish ${BLUFX_VERSION} to beta"
+              ;;
+
+            "Publish to release only (keep beta as-is)")
+              rm -rf "$REL_DIR"
+              cp -a "$STAGE_DEPOT_ROOT/release/blu_fx" "$REL_DIR"
+              COMMIT_MSG="chore(depot): publish ${BLUFX_VERSION} to release"
+              ;;
+
+            "Promote beta->release, then publish to beta")
+              if [[ ! -f "$BETA_DIR/skunkcrafts_updater_config.txt" ]]; then
+                echo "::error::Cannot promote: $BETA_DIR/skunkcrafts_updater_config.txt missing on gh-pages."
+                exit 1
+              fi
+              PROMOTED_VER=$(grep '^version|' "$BETA_DIR/skunkcrafts_updater_config.txt" | head -n1 | cut -d'|' -f2 | tr -d '\r')
+              rm -rf "$REL_DIR"
+              cp -a "$BETA_DIR" "$REL_DIR"
+              rm -rf "$BETA_DIR"
+              cp -a "$STAGE_DEPOT_ROOT/beta/blu_fx" "$BETA_DIR"
+              COMMIT_MSG="chore(depot): promote beta (${PROMOTED_VER}) -> release, publish ${BLUFX_VERSION} to beta"
+              ;;
+
+            "Publish to BOTH beta AND release")
+              rm -rf "$BETA_DIR" "$REL_DIR"
+              cp -a "$STAGE_DEPOT_ROOT/beta/blu_fx" "$BETA_DIR"
+              cp -a "$STAGE_DEPOT_ROOT/release/blu_fx" "$REL_DIR"
+              COMMIT_MSG="chore(depot): publish ${BLUFX_VERSION} to beta and release"
+              ;;
+          esac
+
+          touch .nojekyll
+          git add -A
+
+          if git diff --cached --quiet; then
+            DEPOT_RESULT="Depot files already matched ${BLUFX_VERSION} (no gh-pages commit needed)."
+            echo "$DEPOT_RESULT"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "$COMMIT_MSG"
+            git push origin gh-pages
+            DEPOT_RESULT="$COMMIT_MSG"
+          fi
+
+          CUR_DAILY="(none)"
+          CUR_BETA="(none)"
+          CUR_REL="(none)"
+          [[ -f "$DAILY_DIR/skunkcrafts_updater_config.txt" ]] && CUR_DAILY=$(grep '^version|' "$DAILY_DIR/skunkcrafts_updater_config.txt" | head -n1 | cut -d'|' -f2 | tr -d '\r')
+          [[ -f "$BETA_DIR/skunkcrafts_updater_config.txt" ]] && CUR_BETA=$(grep '^version|' "$BETA_DIR/skunkcrafts_updater_config.txt" | head -n1 | cut -d'|' -f2 | tr -d '\r')
+          [[ -f "$REL_DIR/skunkcrafts_updater_config.txt" ]] && CUR_REL=$(grep '^version|' "$REL_DIR/skunkcrafts_updater_config.txt" | head -n1 | cut -d'|' -f2 | tr -d '\r')
+
+          {
+            echo "### SkunkCrafts Publish Summary"
+            echo "- **Selected action:** \`${PUBLISH_ACTION}\`"
+            echo "- **Depot update:** ${DEPOT_RESULT}"
+            echo "- **Live \`daily\` channel version:** \`${CUR_DAILY}\`"
+            echo "- **Live \`beta\` channel version:** \`${CUR_BETA}\`"
+            echo "- **Live \`release\` channel version:** \`${CUR_REL}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Package Release ZIP and update Git tag
+        if: inputs.create_release == true
+        env:
+          BLUFX_VERSION: ${{ needs.build.outputs.blufx_version }}
+        run: |
+          chmod +x deploy/package.sh
+          ./deploy/package.sh
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "v${BLUFX_VERSION}" "${{ github.sha }}"
+          git push origin "refs/tags/v${BLUFX_VERSION}" --force
+          echo "- **Git tag & GitHub Release:** \`v${BLUFX_VERSION}\` (\`blu_fx_v${BLUFX_VERSION}.zip\`)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish or update GitHub Release
+        if: inputs.create_release == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ needs.build.outputs.blufx_version }}"
+          name: "BLU-fx v${{ needs.build.outputs.blufx_version }}"
+          body_path: release/blu_fx/ReleaseNotes.txt
+          files: build/dist/blu_fx_v${{ needs.build.outputs.blufx_version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

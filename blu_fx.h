@@ -28,7 +28,7 @@
 #define NAME_BLANK "      "           /* to align multi-line log entries :-) */
 #define NAME_LOWERCASE "blu_fx"
 
-#define VERSION "2.0b1"
+#define VERSION "2.0.0b1"
 #define VERSION_BLANK "     "         /* to align multi-line log entries :-) */
 
 // Define qualified name that includes version (e.g., "BLU-fx v1.3.0")
@@ -152,6 +152,7 @@ void ClearPrePresetScratchpad(void);
 bool HasPrePresetScratchpad(void);
 void ApplyPreset(int presetIdx);
 void UpdatePostProcessingMenuState(void);
+void UpdateMenuCheckmarks(void);
 void SetPostProcessingEnabled(bool enabled);
 void SetFpsLimiterEnabled(bool enabled);
 void SetControlCinemaVeriteEnabled(bool enabled);
@@ -163,6 +164,9 @@ bool SaveSettingsToFile(const std::string& path);
 bool LoadSettingsFromFile(const std::string& path);
 void EnsureProfilesDirectoryExists(void);
 void EnsurePresetsDirectoryExists(void); // alias
+
+// Global command references
+extern XPLMCommandRef g_ToggleUserGuideCmd;
 
 // Live Preview Modes:
 enum BluFxPreviewMode {
@@ -185,6 +189,13 @@ extern float sUiOpacity;
 extern int sConfirmOnClose;
 extern int sWindowLeft;
 extern int sWindowTop;
+
+// User Guide (DocViewer) persistent preferences (in-simulator boxels & zoom):
+extern int sDocViewerLeft;
+extern int sDocViewerTop;
+extern int sDocViewerWidth;
+extern int sDocViewerHeight;
+extern float sDocViewerZoom;
 
 std::string GetPrefsFilePath(void);
 bool LoadPreferences(void);

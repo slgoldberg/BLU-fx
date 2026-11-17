@@ -83,6 +83,7 @@ add_compile_options(-O3 -fPIC)
 list(APPEND BLUFX_SRCS
     blu_fx.cpp
     settings-img-window.cpp
+    doc-viewer-img-window.cpp
     GLee5_4/GLee.c
     ImGui/imgui.cpp
     ImGui/imgui_demo.cpp
@@ -113,9 +114,8 @@ endif ()
 
 # Link OpenGL and related libraries.
 if (UNIX)
-find_package(OpenGL REQUIRED)  # apt install freeglut3-dev
-find_library(GLUT_LIBRARY NAMES glut GLUT glut64)  # apt install freeglut3-dev
-target_link_libraries(blu_fx ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
+find_package(OpenGL REQUIRED)
+target_link_libraries(blu_fx ${OPENGL_LIBRARIES})
 elseif (WIN32)
     find_package(OpenGL REQUIRED)
     target_link_libraries(blu_fx ${OPENGL_LIBRARIES})
@@ -192,6 +192,14 @@ elseif (APPLE)
             "/Users/brat/xp11/Resources/plugins/blu_fx/mac_x64")
     install(TARGETS blu_fx DESTINATION
             "/Users/brat/xp12/Resources/plugins/blu_fx/mac_x64")
+    install(DIRECTORY docs DESTINATION
+            "/Users/brat/xp11/Resources/plugins/blu_fx")
+    install(DIRECTORY docs DESTINATION
+            "/Users/brat/xp12/Resources/plugins/blu_fx")
+    install(DIRECTORY docs/images DESTINATION
+            "/Users/brat/xp11/Resources/plugins/blu_fx")
+    install(DIRECTORY docs/images DESTINATION
+            "/Users/brat/xp12/Resources/plugins/blu_fx")
 elseif (UNIX)
     install(TARGETS blu_fx DESTINATION
             "/Users/brat/xp11/Resources/plugins/blu_fx/lin_x64")

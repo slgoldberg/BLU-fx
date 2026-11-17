@@ -12,6 +12,7 @@
  */
 
 #include "settings-img-window.h"
+#include "doc-viewer-img-window.h"
 #include "blu_fx.h"
 #include "ImgFontAtlas.h"
 
@@ -415,6 +416,7 @@ SettingsImgWindow::~SettingsImgWindow()
         XPLMDestroyFlightLoop(mFlightLoopId);
         mFlightLoopId = nullptr;
     }
+    UpdateMenuCheckmarks();
 }
 
 void SettingsImgWindow::RequestClose()
@@ -424,6 +426,7 @@ void SettingsImgWindow::RequestClose()
     } else {
         SetVisible(false);
         SavePreferences();
+        UpdateMenuCheckmarks();
     }
 }
 
@@ -497,7 +500,7 @@ void SettingsImgWindow::drawCustomTitleBar()
     ImVec2 start = ImGui::GetCursorScreenPos();
     float availX = ImGui::GetContentRegionAvail().x;
     bool showTitleAbout = (sPreviewMode == PREVIEW_MODE_SPLIT);
-    float gripWidth = availX - (showTitleAbout ? 90.0f : 65.0f);
+    float gripWidth = availX - (showTitleAbout ? 115.0f : 90.0f);
 
     if (gripWidth > 20.0f) {
         // 3 grip lines moved up 1 boxel (startY = centerY - 4.0f) with 1 extra boxel spacing (4.0f):
@@ -512,12 +515,26 @@ void SettingsImgWindow::drawCustomTitleBar()
     }
 
     if (showTitleAbout) {
-        ImGui::SameLine(ImGui::GetWindowWidth() - 85.0f);
+        ImGui::SameLine(ImGui::GetWindowWidth() - 110.0f);
+        if (ImGui::SmallButtonLink(ICON_FA_QUESTION_CIRCLE "##doc_help")) {
+            if (g_ToggleUserGuideCmd) {
+                XPLMCommandOnce(g_ToggleUserGuideCmd);
+            }
+        }
+        ImGui::TimedTooltip::TextMD("**BLU-fx User Guide:**\nOpen the interactive manual, quick reference, and shortcuts guide.");
+        ImGui::SameLine();
         ImGui::SmallButtonLink(ICON_FA_INFO_CIRCLE "##about");
         ImGui::TimedTooltip::TextMD(s_AboutTooltipMD);
         ImGui::SameLine();
     } else {
-        ImGui::SameLine(ImGui::GetWindowWidth() - 60.0f);
+        ImGui::SameLine(ImGui::GetWindowWidth() - 85.0f);
+        if (ImGui::SmallButtonLink(ICON_FA_QUESTION_CIRCLE "##doc_help")) {
+            if (g_ToggleUserGuideCmd) {
+                XPLMCommandOnce(g_ToggleUserGuideCmd);
+            }
+        }
+        ImGui::TimedTooltip::TextMD("**BLU-fx User Guide:**\nOpen the interactive manual, quick reference, and shortcuts guide.");
+        ImGui::SameLine();
     }
     if (IsPoppedOut()) {
         if (ImGui::SmallButtonLink(ICON_FA_WINDOW_MAXIMIZE "##popin")) {
@@ -837,7 +854,7 @@ void SettingsImgWindow::buildInterface()
     if (IM_BOLD_FONT) ImGui::PopFont();
     ImGui::TimedTooltip::TextMD(
         "**Tip:** Hover over any slider track and **spin your mouse wheel** for fine 0.01 step adjustments, "
-        "or click the **`[↺]`** button next to any slider to toggle between its default and your custom value!"
+        "or click the **Reset (↺)** button next to any slider to toggle between its default and your custom value!"
     );
 
     const BLUfxPreset& def = BLUfxPresets[PRESET_DEFAULT];
@@ -1691,6 +1708,7 @@ void SettingsImgWindow::buildInterface()
                 mShowCloseConfirmModal = false;
                 ImGui::CloseCurrentPopup();
                 SetVisible(false);
+                UpdateMenuCheckmarks();
             }
             ImGui::PopStyleColor(2);
             ImGui::TimedTooltip::TextMD(("Save current adjustments into <badge emerald>" + s_SelectedPresetFilename + "</badge> and close.").c_str());
@@ -1708,6 +1726,7 @@ void SettingsImgWindow::buildInterface()
                 mShowCloseConfirmModal = false;
                 ImGui::CloseCurrentPopup();
                 SetVisible(false);
+                UpdateMenuCheckmarks();
             }
             ImGui::PopStyleColor(2);
             ImGui::TimedTooltip::TextMD(("Set <badge cyan>" + std::string(BLUfxPresetNames[s_ActiveCuratedPresetIdx]) + "</badge> as your permanent startup preset and close.").c_str());

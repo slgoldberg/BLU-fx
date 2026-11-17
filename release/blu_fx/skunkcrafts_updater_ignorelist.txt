@@ -1,0 +1,7 @@
+.DS_Store
+mac_x64/.DS_Store
+win_x64/.DS_Store
+lin_x64/.DS_Store
+docs/.DS_Store
+docs/history/.DS_Store
+index.html

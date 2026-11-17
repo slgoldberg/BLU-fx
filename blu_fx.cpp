@@ -18,6 +18,19 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#if IBM
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <mmsystem.h>
+#include "GLee.h"
+#define __glext_h_ 1
+#pragma comment(lib, "winmm.lib")
+#elif APL
+#include <OpenGL/gl.h>
+#elif LIN
+#include <GL/gl.h>
+#endif
+
 #ifndef XPLM_DEPRECATED
 #define XPLM_DEPRECATED 1   /* for legacy PostProcessingCallback draw hook */
 #endif
@@ -25,6 +38,7 @@
 
 #include "blu_fx.h"
 #include "settings-img-window.h"
+#include "doc-viewer-img-window.h"
 
 #include "XPLMDataAccess.h"
 #include "XPLMDefs.h"
@@ -53,15 +67,6 @@
 #if !IBM
 #include <string.h>
 #include <unistd.h>
-#endif
-
-#if APL
-#include <OpenGL/gl.h>
-#elif IBM
-#include "GLee.h"
-#pragma comment( lib, "winmm.lib")   
-#elif LIN
-#include <GL/gl.h>
 #endif
 
 const char* const BLUfxPresetNames[PRESET_MAX] =
@@ -557,17 +562,37 @@ static XPLMDataRef xplmVersionDataRef = NULL;
 // Modern ImgWindow v2 Settings Window instance & toggle commands:
 static std::unique_ptr<SettingsImgWindow> g_SettingsWindow;
 static XPLMCommandRef g_ToggleSettingsCmd = NULL;
+XPLMCommandRef g_ToggleUserGuideCmd = NULL;
 static XPLMCommandRef g_TogglePostProcessingCmd = NULL;
 static XPLMCommandRef g_MomentaryPostProcessingCmd = NULL;
 static XPLMMenuID g_BluFxMenu = NULL;
+static int g_ToggleSettingsMenuItemIdx = -1;
+static int g_ToggleUserGuideMenuItemIdx = -1;
 static int g_TogglePostProcessingMenuItemIdx = -1;
 
-void UpdatePostProcessingMenuState(void)
+void UpdateMenuCheckmarks(void)
 {
-    if (g_BluFxMenu != NULL && g_TogglePostProcessingMenuItemIdx >= 0) {
+    if (g_BluFxMenu == NULL) return;
+
+    if (g_TogglePostProcessingMenuItemIdx >= 0) {
         XPLMCheckMenuItem(g_BluFxMenu, g_TogglePostProcessingMenuItemIdx,
             postProcesssingEnabled ? xplm_Menu_Checked : xplm_Menu_Unchecked);
     }
+    if (g_ToggleSettingsMenuItemIdx >= 0) {
+        bool settingsVisible = (g_SettingsWindow && g_SettingsWindow->GetVisible());
+        XPLMCheckMenuItem(g_BluFxMenu, g_ToggleSettingsMenuItemIdx,
+            settingsVisible ? xplm_Menu_Checked : xplm_Menu_Unchecked);
+    }
+    if (g_ToggleUserGuideMenuItemIdx >= 0) {
+        bool docVisible = DocViewerImgWindow::IsOpen();
+        XPLMCheckMenuItem(g_BluFxMenu, g_ToggleUserGuideMenuItemIdx,
+            docVisible ? xplm_Menu_Checked : xplm_Menu_Unchecked);
+    }
+}
+
+void UpdatePostProcessingMenuState(void)
+{
+    UpdateMenuCheckmarks();
 }
 
 // draw-callback that adds post-processing
@@ -652,7 +677,7 @@ static int PostProcessingCallback(XPLMDrawingPhase inPhase, int inIsBefore, void
     int settingsWindowOpen = (g_SettingsWindow && g_SettingsWindow->GetVisible()) ? 1 : 0;
     float splitFrac = 0.0f;
     if (settingsWindowOpen && sPreviewMode == PREVIEW_MODE_SPLIT && !sMomentaryFullView) {
-        splitFrac = std::clamp(sPreviewSplitPosition, 0.05f, 0.95f);
+        splitFrac = (sPreviewSplitPosition < 0.05f) ? 0.05f : ((sPreviewSplitPosition > 0.95f) ? 0.95f : sPreviewSplitPosition);
     }
 
     glColor3f(1.0f, 1.0f, 1.0f);
@@ -1040,6 +1065,11 @@ float sUiOpacity = 0.95f;
 int sConfirmOnClose = 1; // 1 = prompt with confirmation dialog when closing with unsaved adjustments; 0 = silently keep in-memory
 int sWindowLeft = -1;
 int sWindowTop = -1;
+int sDocViewerLeft = -1;
+int sDocViewerTop = -1;
+int sDocViewerWidth = 0;
+int sDocViewerHeight = 0;
+float sDocViewerZoom = 1.0f;
 int sPreviewMode = PREVIEW_MODE_SPLIT;
 float sPreviewSplitPosition = 0.50f;
 bool sMomentaryFullView = false;
@@ -1103,6 +1133,13 @@ bool SavePreferences(void)
     file << "confirmOnClose=" << sConfirmOnClose << std::endl;
     file << "windowLeft=" << sWindowLeft << std::endl;
     file << "windowTop=" << sWindowTop << std::endl;
+    if (sDocViewerLeft >= 0 && sDocViewerTop >= 0 && sDocViewerWidth >= 480 && sDocViewerHeight >= 300) {
+        file << "docViewerLeft=" << sDocViewerLeft << std::endl;
+        file << "docViewerTop=" << sDocViewerTop << std::endl;
+        file << "docViewerWidth=" << sDocViewerWidth << std::endl;
+        file << "docViewerHeight=" << sDocViewerHeight << std::endl;
+        file << "docViewerZoom=" << std::fixed << std::setprecision(2) << sDocViewerZoom << std::endl;
+    }
     file << "previewMode=" << (sPreviewMode == PREVIEW_MODE_FULL ? "full" : "split") << std::endl;
     file << "previewSplit=" << std::fixed << std::setprecision(2) << sPreviewSplitPosition << std::endl;
     file << "previewDivider=" << (sShowSplitDivider ? 1 : 0) << std::endl;
@@ -1160,6 +1197,18 @@ bool LoadPreferences(void)
             iss >> sWindowLeft;
         } else if (key == "windowTop" || key == "windowY") {
             iss >> sWindowTop;
+        } else if (key == "docViewerLeft") {
+            iss >> sDocViewerLeft;
+        } else if (key == "docViewerTop") {
+            iss >> sDocViewerTop;
+        } else if (key == "docViewerWidth") {
+            iss >> sDocViewerWidth;
+        } else if (key == "docViewerHeight") {
+            iss >> sDocViewerHeight;
+        } else if (key == "docViewerZoom") {
+            iss >> sDocViewerZoom;
+            if (sDocViewerZoom < 0.50f) sDocViewerZoom = 0.50f;
+            if (sDocViewerZoom > 2.00f) sDocViewerZoom = 2.00f;
         } else if (key == "previewMode") {
             sPreviewMode = (val == "full") ? PREVIEW_MODE_FULL : PREVIEW_MODE_SPLIT;
         } else if (key == "previewSplit") {
@@ -1435,6 +1484,15 @@ static void ToggleSettingsWindow()
     } else {
         g_SettingsWindow->SetVisible(true);
     }
+    UpdateMenuCheckmarks();
+}
+
+int ToggleUserGuideCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase == xplm_CommandBegin) {
+        DocViewerImgWindow::ToggleInstance();
+    }
+    return 0;
 }
 
 // handles the menu-entries (fallback for when XPLMAppendMenuItemWithCommand is not used)
@@ -1445,6 +1503,8 @@ void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
     } else if ((intptr_t) inItemRef == 1) {
         SetPostProcessingEnabled(!postProcesssingEnabled);
         SavePreferences();
+    } else if ((intptr_t) inItemRef == 2) {
+        DocViewerImgWindow::ToggleInstance();
     }
 }
 
@@ -1564,6 +1624,9 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     g_ToggleSettingsCmd = XPLMCreateCommand(NAME_LOWERCASE "/toggle_settings", "toggle " NAME " settings window open/closed");
     XPLMRegisterCommandHandler(g_ToggleSettingsCmd, toggleSettingsHandler, 1, NULL);
 
+    g_ToggleUserGuideCmd = XPLMCreateCommand(NAME_LOWERCASE "/user_guide/toggle", "toggle " NAME " User Guide window");
+    XPLMRegisterCommandHandler(g_ToggleUserGuideCmd, ToggleUserGuideCommandHandler, 1, NULL);
+
     g_TogglePostProcessingCmd = XPLMCreateCommand(NAME_LOWERCASE "/post_processing/toggle", "toggle " NAME " post-processing on/off");
     XPLMRegisterCommandHandler(g_TogglePostProcessingCmd, TogglePostProcessingCommandHandler, 1, NULL);
 
@@ -1576,10 +1639,12 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     
     // before adding modern menu option, check to be sure XPLM 301 is available:
     if (XPLMFindSymbol("XPLMAppendMenuItemWithCommand")) {
-        XPLMAppendMenuItemWithCommand(g_BluFxMenu, "Settings window", g_ToggleSettingsCmd);
+        g_ToggleSettingsMenuItemIdx = XPLMAppendMenuItemWithCommand(g_BluFxMenu, "Settings window", g_ToggleSettingsCmd);
+        g_ToggleUserGuideMenuItemIdx = XPLMAppendMenuItemWithCommand(g_BluFxMenu, "User Guide", g_ToggleUserGuideCmd);
         g_TogglePostProcessingMenuItemIdx = XPLMAppendMenuItemWithCommand(g_BluFxMenu, "Post-processing", g_TogglePostProcessingCmd);
     } else {
-        XPLMAppendMenuItem(g_BluFxMenu, "Settings window", (void*)0, 1);
+        g_ToggleSettingsMenuItemIdx = XPLMAppendMenuItem(g_BluFxMenu, "Settings window", (void*)0, 1);
+        g_ToggleUserGuideMenuItemIdx = XPLMAppendMenuItem(g_BluFxMenu, "User Guide", (void*)2, 1);
         g_TogglePostProcessingMenuItemIdx = XPLMAppendMenuItem(g_BluFxMenu, "Post-processing", (void*)1, 1);
     }
 
@@ -1597,6 +1662,10 @@ PLUGIN_API void XPluginStop(void)
     if (g_ToggleSettingsCmd) {
         XPLMUnregisterCommandHandler(g_ToggleSettingsCmd, toggleSettingsHandler, 1, NULL);
         g_ToggleSettingsCmd = NULL;
+    }
+    if (g_ToggleUserGuideCmd) {
+        XPLMUnregisterCommandHandler(g_ToggleUserGuideCmd, ToggleUserGuideCommandHandler, 1, NULL);
+        g_ToggleUserGuideCmd = NULL;
     }
     if (g_TogglePostProcessingCmd) {
         XPLMUnregisterCommandHandler(g_TogglePostProcessingCmd, TogglePostProcessingCommandHandler, 1, NULL);
@@ -1617,8 +1686,10 @@ PLUGIN_API void XPluginStop(void)
 
 PLUGIN_API void XPluginDisable(void)
 {
-    // Destroy SettingsImgWindow and flush shared font atlas & deferred GPU resources:
+    SavePreferences();
+    // Destroy SettingsImgWindow and DocViewerImgWindow, then flush shared font atlas & deferred GPU resources:
     g_SettingsWindow.reset();
+    DocViewerImgWindow::DestroyInstance();
     TeardownImGui();
 
     if (fakeWindow != NULL) {
