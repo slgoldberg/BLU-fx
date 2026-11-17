@@ -1575,6 +1575,26 @@ void SettingsImgWindow::buildInterface()
     ImGui::EndGroup();
 
     // ------------------------------------------------------------------------
+    // Compatibility & Downgrade Safety Option
+    // ------------------------------------------------------------------------
+    ImGui::Spacing();
+    ImGui::Separator();
+    bool mirrorLegacy = (sMirrorLegacyIni != 0);
+    if (ImGui::Checkbox("Mirror to legacy blu_fx.ini (v1.x downgrade safety)", &mirrorLegacy)) {
+        sMirrorLegacyIni = mirrorLegacy ? 1 : 0;
+        SavePreferences();
+        if (sMirrorLegacyIni) {
+            SaveSettingsToFile(CONFIG_PATH);
+        }
+    }
+    ImGui::TimedTooltip::TextMD(
+        "**Legacy Downgrade Mirroring:**\n"
+        "Automatically writes active color grading settings to `Resources/plugins/blu_fx/blu_fx.ini`.\n\n"
+        "If you ever switch back or downgrade to BLU-fx v1.x (via SkunkCrafts Updater or manual archive),\n"
+        "v1.x will seamlessly pick up your latest color grading adjustments."
+    );
+
+    // ------------------------------------------------------------------------
     // Legacy XP11 Sections (Raleigh Scale, FPS-Limiter, Cinema Verite)
     // ------------------------------------------------------------------------
     if (LEGACY_FEATURES) {

@@ -42,6 +42,13 @@ HIGHLIGHTS FOR THIS RELEASE (v2.0.0b1):
     - Distributed across high-speed global CDN (GitHub Pages) with multi-channel
       support (release, beta, and daily).
 
+  * Downgrade Safety & Legacy Mirroring:
+    - Automatically updates a mirror of current color adjustments into the root
+      blu_fx.ini file whenever adjustments or profiles are saved.
+    - If you ever downgrade or switch back to v1.x, your latest color grading
+      settings remain fully intact and immediately accessible.
+    - Can be toggled off at any time via a dedicated checkbox in the Settings window.
+
 ===============================================================================
 HISTORICAL RELEASE NOTES:
 ===============================================================================

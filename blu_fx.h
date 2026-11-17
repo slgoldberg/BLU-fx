@@ -187,6 +187,7 @@ extern std::string sSessionInitialProfile;
 extern std::string sUiMode;
 extern float sUiOpacity;
 extern int sConfirmOnClose;
+extern int sMirrorLegacyIni;
 extern int sWindowLeft;
 extern int sWindowTop;
 

@@ -139,6 +139,14 @@ BLU-fx distinguishes between *saving a file* and *choosing what loads on sim boo
 - The green **Startup Default** status badge will update immediately, confirming your chosen profile or preset will be applied on every future flight.
 - If you ever want to discard active tweaks and return to your boot default during flight, click **Reload Startup**.
 
+### Downgrade Safety & Legacy Mirroring
+BLU-fx v2.0 introduces multi-profile support and stores user profiles in `Resources/plugins/blu_fx/profiles/` and persistent application preferences in `Output/preferences/blu_fx.prf`.
+
+Legacy versions of BLU-fx (v1.x) stored their single settings file directly at `Resources/plugins/blu_fx/blu_fx.ini`. To make downgrading or comparing versions seamless:
+- **Automatic Mirroring (Default: Enabled):** Whenever you save a profile or make adjustments, BLU-fx automatically writes a mirror copy of your current color grading values and frame-rate limits into the root `blu_fx.ini` file.
+- **Seamless Rollback:** If you ever downgrade to BLU-fx v1.x (via the SkunkCrafts Updater channel selector or a manual archive), v1.x will immediately find your latest color grading settings intact without missing files or broken defaults.
+- **Disabling the Mirror:** If you prefer to keep your legacy `blu_fx.ini` frozen in time without updates from v2.0, you can uncheck **Mirror to legacy blu_fx.ini** at the bottom of the Settings window.
+
 ---
 
 ## 6. Keyboard & Joystick Commands

@@ -1064,6 +1064,7 @@ std::string sSessionInitialProfile = "blu_fx.ini";
 std::string sUiMode = "sliders";
 float sUiOpacity = 0.95f;
 int sConfirmOnClose = 1; // 1 = prompt with confirmation dialog when closing with unsaved adjustments; 0 = silently keep in-memory
+int sMirrorLegacyIni = 1; // 1 = mirror active profile to root blu_fx.ini for v1.x downgrade safety; 0 = disabled
 int sWindowLeft = -1;
 int sWindowTop = -1;
 int sDocViewerLeft = -1;
@@ -1132,6 +1133,7 @@ bool SavePreferences(void)
     file << "uiMode=" << sUiMode << std::endl;
     file << "uiOpacity=" << std::fixed << std::setprecision(2) << sUiOpacity << std::endl;
     file << "confirmOnClose=" << sConfirmOnClose << std::endl;
+    file << "mirrorLegacyIni=" << sMirrorLegacyIni << std::endl;
     file << "windowLeft=" << sWindowLeft << std::endl;
     file << "windowTop=" << sWindowTop << std::endl;
     if (sDocViewerLeft >= 0 && sDocViewerTop >= 0 && sDocViewerWidth >= 480 && sDocViewerHeight >= 300) {
@@ -1194,6 +1196,8 @@ bool LoadPreferences(void)
             if (sUiOpacity > 1.00f) sUiOpacity = 1.00f;
         } else if (key == "confirmOnClose") {
             iss >> sConfirmOnClose;
+        } else if (key == "mirrorLegacyIni") {
+            iss >> sMirrorLegacyIni;
         } else if (key == "windowLeft" || key == "windowX") {
             iss >> sWindowLeft;
         } else if (key == "windowTop" || key == "windowY") {
@@ -1317,6 +1321,31 @@ bool SaveSettingsToFile(const std::string& path)
         file << "raleighScale=" << std::fixed << std::setprecision(1) << raleighScale << std::endl;
 
         file.close();
+
+        // Optional legacy mirror to root blu_fx.ini for v1.x downgrade safety:
+        if (sMirrorLegacyIni && path != CONFIG_PATH) {
+            std::fstream legFile;
+            legFile.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
+            if (legFile.is_open()) {
+                legFile << "# BLU-fx v1.x Legacy Mirror (Auto-generated from active profile: " << sActiveProfileName << ")" << std::endl;
+                legFile << "brightness=" << std::fixed << std::setprecision(2) << brightness << std::endl;
+                legFile << "contrast=" << std::fixed << std::setprecision(2) << contrast << std::endl;
+                legFile << "saturation=" << std::fixed << std::setprecision(2) << saturation << std::endl;
+                legFile << "redScale=" << std::fixed << std::setprecision(2) << redScale << std::endl;
+                legFile << "greenScale=" << std::fixed << std::setprecision(2) << greenScale << std::endl;
+                legFile << "blueScale=" << std::fixed << std::setprecision(2) << blueScale << std::endl;
+                legFile << "redOffset=" << std::fixed << std::setprecision(2) << redOffset << std::endl;
+                legFile << "greenOffset=" << std::fixed << std::setprecision(2) << greenOffset << std::endl;
+                legFile << "blueOffset=" << std::fixed << std::setprecision(2) << blueOffset << std::endl;
+                legFile << "vignette=" << std::fixed << std::setprecision(2) << vignette << std::endl;
+                legFile << "raleighScale=" << std::fixed << std::setprecision(1) << raleighScale << std::endl;
+                legFile << "maxFps=" << (int)maxFps << std::endl;
+                legFile << "cinemaVeriteEnabled=" << controlCinemaVeriteEnabled << std::endl;
+                legFile << "cinemaVeriteDisableTime=" << std::fixed << std::setprecision(1) << disableCinemaVeriteTime << std::endl;
+                legFile.close();
+            }
+        }
+
         return true;
     }
     return false;
