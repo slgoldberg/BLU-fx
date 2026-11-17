@@ -1580,7 +1580,11 @@ void SettingsImgWindow::buildInterface()
     ImGui::Separator();
     if (IM_SMALLER_FONT) ImGui::PushFont(IM_SMALLER_FONT);
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.64f, 0.72f, 0.75f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.42f, 0.50f, 0.60f, 0.85f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.16f, 0.20f, 0.26f, 0.90f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.24f, 0.30f, 0.38f, 1.00f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
     bool disableMirror = (sMirrorLegacyIni == 0);
     if (ImGui::Checkbox("I will never return to v1; remove backwards-compatibility hacks.", &disableMirror)) {
@@ -1590,6 +1594,12 @@ void SettingsImgWindow::buildInterface()
             SyncLegacyIniMirror();
         }
     }
+
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(4);
+    if (IM_SMALLER_FONT) ImGui::PopFont();
+
+    // TimedTooltip invoked in clean ambient font environment:
     ImGui::TimedTooltip::TextMD(disableMirror
         ? "**Legacy Downgrade Compatibility: DISABLED**\n"
           "BLU-fx will no longer update `blu_fx.ini` in the plugin root.\n\n"
@@ -1600,10 +1610,6 @@ void SettingsImgWindow::buildInterface()
           "v1.x will seamlessly pick up your latest color grading adjustments.\n\n"
           "*(Check this box only if you will never return to v1.x)*"
     );
-
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
-    if (IM_SMALLER_FONT) ImGui::PopFont();
 
     // ------------------------------------------------------------------------
     // Legacy XP11 Sections (Raleigh Scale, FPS-Limiter, Cinema Verite)
@@ -1668,10 +1674,10 @@ void SettingsImgWindow::buildInterface()
     int left, top, right, bottom;
     GetWindowGeometry(left, top, right, bottom);
     int currentH = top - bottom;
-    int targetH = (int)(ImGui::GetCursorPosY() + ImGui::GetStyle().WindowPadding.y);
+    int targetH = (int)(ImGui::GetCursorPosY() + 2.0f);
 
-    // Defensive bounds guard: height must be realistic (min 450px, max 1200px)
-    constexpr int minValidH = 450;
+    // Defensive bounds guard: height must be realistic (min 350px, max 1200px)
+    constexpr int minValidH = 350;
     constexpr int maxValidH = 1200;
     if (targetH >= minValidH && targetH <= maxValidH && std::abs(currentH - targetH) > 1 && !IsPoppedOut()) {
         auto geom = WindowGeometry::FromTopLeft(left, top, right - left, targetH);
