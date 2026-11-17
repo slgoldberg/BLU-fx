@@ -1105,22 +1105,26 @@ void EnsurePresetsDirectoryExists(void)
     EnsureProfilesDirectoryExists();
 }
 
+static void EnsurePreferencesDirectoryExists(void)
+{
+    struct stat st;
+#if IBM
+    if (stat(".\\Output", &st) != 0) _mkdir(".\\Output");
+    if (stat(".\\Output\\preferences", &st) != 0) _mkdir(".\\Output\\preferences");
+#else
+    if (stat("./Output", &st) != 0) mkdir("./Output", 0755);
+    if (stat("./Output/preferences", &st) != 0) mkdir("./Output/preferences", 0755);
+#endif
+}
+
 std::string GetPrefsFilePath(void)
 {
-    char buf[512] = {0};
-    XPLMGetPrefsPath(buf);
-    XPLMExtractFileAndPath(buf);
-    std::string path = buf;
-    char sep = *XPLMGetDirectorySeparator();
-    if (!path.empty() && path.back() != '/' && path.back() != '\\') {
-        path += sep;
-    }
-    path += "blu_fx.prf";
-    return path;
+    return PREFS_PATH;
 }
 
 bool SavePreferences(void)
 {
+    EnsurePreferencesDirectoryExists();
     std::string path = GetPrefsFilePath();
     std::fstream file;
     file.open(path.c_str(), std::ios_base::out | std::ios_base::trunc);
@@ -1279,22 +1283,6 @@ void MigrateLegacyConfigIfNeeded(void)
             }
             SavePreferences();
             XPLMDebugString("Blu-FX: Created default Output/preferences/blu_fx.prf\n");
-        }
-    } else {
-        // Preferences file already exists.
-        // Check for manual "muscle memory" drop into root folder:
-        if (hasLegacyIni) {
-            std::string destProfile = std::string(PROFILES_PATH) + "/blu_fx.ini";
-            if (stat(destProfile.c_str(), &st) == 0) {
-                destProfile = std::string(PROFILES_PATH) + "/blu_fx_imported.ini";
-                sActiveProfileName = "blu_fx_imported.ini";
-            } else {
-                sActiveProfileName = "blu_fx.ini";
-            }
-
-            SaveSettingsToFile(destProfile);
-            SavePreferences();
-            XPLMDebugString("Blu-FX: Adopted root blu_fx.ini into profiles/\n");
         }
     }
 }

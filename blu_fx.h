@@ -57,6 +57,15 @@
 #define PRESETS_PATH PROFILES_PATH
 #define PRESETS_PATH_DISPLAY PROFILES_PATH_DISPLAY
 
+// Define user preferences file path
+#if IBM
+#define PREFS_PATH ".\\Output\\preferences\\" NAME_LOWERCASE ".prf"
+#else
+#define PREFS_PATH "./Output/preferences/" NAME_LOWERCASE ".prf"
+#endif
+
+#define PREFS_PATH_DISPLAY "Output/preferences/" NAME_LOWERCASE ".prf"
+
 #define DEFAULT_POST_PROCESSING_ENABLED 1
 #define DEFAULT_FPS_LIMITER_ENABLED 0
 #define DEFAULT_CONTROL_CINEMA_VERITE_ENABLED 0 /* was 1 by default in 32-bit version */
