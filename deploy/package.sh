@@ -32,11 +32,10 @@ ZIP_NAME="blu_fx_v${BLUFX_VERSION}.zip"
 ZIP_PATH="$DIST_ROOT/$ZIP_NAME"
 
 rm -rf "$DIST_DIR"
-mkdir -p "$DIST_DIR/docs" "$DIST_DIR/mac_x64" "$DIST_DIR/win_x64" "$DIST_DIR/lin_x64"
+mkdir -p "$DIST_DIR/docs" "$DIST_DIR/mac_x64" "$DIST_DIR/win_x64" "$DIST_DIR/lin_x64" "$DIST_DIR/profiles"
 
 # 2. Copy documentation & control files
 echo "    Copying documentation and control files..."
-cp -a "$REPO_ROOT/gpl-2.0.txt" "$DIST_DIR/"
 cp -a "$REPO_ROOT/release/blu_fx/ReleaseNotes.txt" "$DIST_DIR/"
 
 # Generate stamped README.txt with version, timestamp, and attribution
@@ -52,6 +51,11 @@ cp -a "$REPO_ROOT/release/blu_fx/ReleaseNotes.txt" "$DIST_DIR/"
 
 if [[ -f "$REPO_ROOT/docs/BLUFX_User_Guide.pdf" ]]; then
     cp -a "$REPO_ROOT/docs/BLUFX_User_Guide.pdf" "$DIST_DIR/docs/"
+fi
+
+# Copy starter profiles
+if [[ -d "$REPO_ROOT/profiles" ]]; then
+    cp -a "$REPO_ROOT/profiles/"*.ini "$DIST_DIR/profiles/" 2>/dev/null || true
 fi
 
 # Generate Version.txt

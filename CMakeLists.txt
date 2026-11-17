@@ -63,6 +63,7 @@ add_compile_options(-fvisibility=hidden)
 
 if (WIN32)
     add_compile_options(-fpermissive)
+    add_definitions(-D__gl_glext_h_=1)
 endif ()
 
 # Enable stricter warnings and then disable some we are not interested in.
@@ -182,6 +183,15 @@ set_target_properties(blu_fx
     OUTPUT_NAME "blu_fx"
     SUFFIX ".xpl"
 )
+
+if (APPLE)
+    set_target_properties(blu_fx PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/mac_x64")
+elseif (WIN32)
+    set_target_properties(blu_fx PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/win_x64")
+    set_target_properties(blu_fx PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/win_x64")
+elseif (UNIX)
+    set_target_properties(blu_fx PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lin_x64")
+endif ()
 
 # Install target based on platform
 if (WIN32)

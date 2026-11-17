@@ -24,6 +24,7 @@
 #include <mmsystem.h>
 #include "GLee.h"
 #define __glext_h_ 1
+#define __gl_glext_h_ 1
 #pragma comment(lib, "winmm.lib")
 #elif APL
 #include <OpenGL/gl.h>
@@ -1261,13 +1262,10 @@ void MigrateLegacyConfigIfNeeded(void)
                 sActiveProfileName = "blu_fx.ini";
             }
 
-            if (std::rename(CONFIG_PATH, destProfile.c_str()) != 0) {
-                SaveSettingsToFile(destProfile);
-                std::remove(CONFIG_PATH);
-            }
-
+            // Copy settings into profiles/ while preserving legacy blu_fx.ini for downgrade safety:
+            SaveSettingsToFile(destProfile);
             SavePreferences();
-            XPLMDebugString("Blu-FX: Migrated legacy blu_fx.ini to profiles/ and created Output/preferences/blu_fx.prf\n");
+            XPLMDebugString("Blu-FX: Migrated settings to profiles/ (preserved root blu_fx.ini) and created Output/preferences/blu_fx.prf\n");
         } else {
             // Fresh install with no legacy file:
             sActiveProfileName = "blu_fx.ini";
@@ -1290,10 +1288,7 @@ void MigrateLegacyConfigIfNeeded(void)
                 sActiveProfileName = "blu_fx.ini";
             }
 
-            if (std::rename(CONFIG_PATH, destProfile.c_str()) != 0) {
-                SaveSettingsToFile(destProfile);
-                std::remove(CONFIG_PATH);
-            }
+            SaveSettingsToFile(destProfile);
             SavePreferences();
             XPLMDebugString("Blu-FX: Adopted root blu_fx.ini into profiles/\n");
         }

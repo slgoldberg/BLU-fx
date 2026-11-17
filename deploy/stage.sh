@@ -63,6 +63,10 @@ stage_channel() {
         mkdir -p "$STAGING_DIR/docs"
         cp -a "$REPO_ROOT/docs/BLUFX_User_Guide.pdf" "$STAGING_DIR/docs/"
     fi
+    if [[ -d "$REPO_ROOT/profiles" ]]; then
+        mkdir -p "$STAGING_DIR/profiles"
+        cp -a "$REPO_ROOT/profiles/"*.ini "$STAGING_DIR/profiles/" 2>/dev/null || true
+    fi
     echo "blu-fx_v${RESOLVED_VER}  (packaged on $(date))" > "$STAGING_DIR/Version.txt"
 
     # 2. Copy multiplatform binaries
