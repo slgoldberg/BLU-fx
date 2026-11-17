@@ -1584,7 +1584,7 @@ void SettingsImgWindow::buildInterface()
         sMirrorLegacyIni = mirrorLegacy ? 1 : 0;
         SavePreferences();
         if (sMirrorLegacyIni) {
-            SaveSettingsToFile(CONFIG_PATH);
+            SyncLegacyIniMirror();
         }
     }
     ImGui::TimedTooltip::TextMD(

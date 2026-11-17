@@ -1299,6 +1299,33 @@ void MigrateLegacyConfigIfNeeded(void)
     }
 }
 
+// synchronizes active color adjustments to the root blu_fx.ini for legacy v1.x downgrade compatibility
+void SyncLegacyIniMirror(void)
+{
+    if (!sMirrorLegacyIni) return;
+
+    std::fstream legFile;
+    legFile.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
+    if (legFile.is_open()) {
+        legFile << "# BLU-fx v1.x Legacy Mirror (Auto-generated from active profile: " << (sActiveProfileName.empty() ? "Custom" : sActiveProfileName) << ")" << std::endl;
+        legFile << "brightness=" << std::fixed << std::setprecision(2) << brightness << std::endl;
+        legFile << "contrast=" << std::fixed << std::setprecision(2) << contrast << std::endl;
+        legFile << "saturation=" << std::fixed << std::setprecision(2) << saturation << std::endl;
+        legFile << "redScale=" << std::fixed << std::setprecision(2) << redScale << std::endl;
+        legFile << "greenScale=" << std::fixed << std::setprecision(2) << greenScale << std::endl;
+        legFile << "blueScale=" << std::fixed << std::setprecision(2) << blueScale << std::endl;
+        legFile << "redOffset=" << std::fixed << std::setprecision(2) << redOffset << std::endl;
+        legFile << "greenOffset=" << std::fixed << std::setprecision(2) << greenOffset << std::endl;
+        legFile << "blueOffset=" << std::fixed << std::setprecision(2) << blueOffset << std::endl;
+        legFile << "vignette=" << std::fixed << std::setprecision(2) << vignette << std::endl;
+        legFile << "raleighScale=" << std::fixed << std::setprecision(1) << raleighScale << std::endl;
+        legFile << "maxFps=" << (int)maxFps << std::endl;
+        legFile << "cinemaVeriteEnabled=" << controlCinemaVeriteEnabled << std::endl;
+        legFile << "cinemaVeriteDisableTime=" << std::fixed << std::setprecision(1) << disableCinemaVeriteTime << std::endl;
+        legFile.close();
+    }
+}
+
 // saves current color grading adjustments to a specified profile file
 bool SaveSettingsToFile(const std::string& path)
 {
@@ -1324,26 +1351,7 @@ bool SaveSettingsToFile(const std::string& path)
 
         // Optional legacy mirror to root blu_fx.ini for v1.x downgrade safety:
         if (sMirrorLegacyIni && path != CONFIG_PATH) {
-            std::fstream legFile;
-            legFile.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
-            if (legFile.is_open()) {
-                legFile << "# BLU-fx v1.x Legacy Mirror (Auto-generated from active profile: " << sActiveProfileName << ")" << std::endl;
-                legFile << "brightness=" << std::fixed << std::setprecision(2) << brightness << std::endl;
-                legFile << "contrast=" << std::fixed << std::setprecision(2) << contrast << std::endl;
-                legFile << "saturation=" << std::fixed << std::setprecision(2) << saturation << std::endl;
-                legFile << "redScale=" << std::fixed << std::setprecision(2) << redScale << std::endl;
-                legFile << "greenScale=" << std::fixed << std::setprecision(2) << greenScale << std::endl;
-                legFile << "blueScale=" << std::fixed << std::setprecision(2) << blueScale << std::endl;
-                legFile << "redOffset=" << std::fixed << std::setprecision(2) << redOffset << std::endl;
-                legFile << "greenOffset=" << std::fixed << std::setprecision(2) << greenOffset << std::endl;
-                legFile << "blueOffset=" << std::fixed << std::setprecision(2) << blueOffset << std::endl;
-                legFile << "vignette=" << std::fixed << std::setprecision(2) << vignette << std::endl;
-                legFile << "raleighScale=" << std::fixed << std::setprecision(1) << raleighScale << std::endl;
-                legFile << "maxFps=" << (int)maxFps << std::endl;
-                legFile << "cinemaVeriteEnabled=" << controlCinemaVeriteEnabled << std::endl;
-                legFile << "cinemaVeriteDisableTime=" << std::fixed << std::setprecision(1) << disableCinemaVeriteTime << std::endl;
-                legFile.close();
-            }
+            SyncLegacyIniMirror();
         }
 
         return true;
@@ -1492,6 +1500,15 @@ void LoadSettings(void)
         BLUfxPresets[PRESET_USER].raleighScale = raleighScale;
         BLUfxPresets[PRESET_USER].maxFps = maxFps;
         BLUfxPresets[PRESET_USER].disableCinemaVeriteTime = disableCinemaVeriteTime;
+    }
+
+    // Downgrade mirror self-healing: ensure root blu_fx.ini exists if mirroring is active
+    if (sMirrorLegacyIni) {
+        struct stat stRoot;
+        if (stat(CONFIG_PATH, &stRoot) != 0) {
+            SyncLegacyIniMirror();
+            XPLMDebugString("Blu-FX: Materialized missing root blu_fx.ini from active startup profile for downgrade safety\n");
+        }
     }
 
     UpdateDiskSnapshot();

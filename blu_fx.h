@@ -188,6 +188,7 @@ extern std::string sUiMode;
 extern float sUiOpacity;
 extern int sConfirmOnClose;
 extern int sMirrorLegacyIni;
+void SyncLegacyIniMirror(void);
 extern int sWindowLeft;
 extern int sWindowTop;
 
