@@ -1580,9 +1580,9 @@ void SettingsImgWindow::buildInterface()
     ImGui::Separator();
     if (IM_SMALLER_FONT) ImGui::PushFont(IM_SMALLER_FONT);
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.64f, 0.72f, 0.75f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.42f, 0.50f, 0.60f, 0.85f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.16f, 0.20f, 0.26f, 0.90f));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.24f, 0.30f, 0.38f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.40f, 0.48f, 0.58f, 0.68f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.15f, 0.19f, 0.25f, 0.72f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.22f, 0.28f, 0.36f, 0.80f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 1.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 
@@ -1603,12 +1603,12 @@ void SettingsImgWindow::buildInterface()
     ImGui::TimedTooltip::TextMD(disableMirror
         ? "**Legacy Downgrade Compatibility: DISABLED**\n"
           "BLU-fx will no longer update `blu_fx.ini` in the plugin root.\n\n"
-          "*(Uncheck this box to re-enable automatic v1.x downgrade protection)*"
+          "*(Uncheck this box to re-enable automatic v1.x downgrade protection.)*"
         : "**Legacy Downgrade Compatibility: ACTIVE**\n"
-          "BLU-fx automatically mirrors active color adjustments into `blu_fx.ini`.\n\n"
-          "If you ever roll back to v1.x (via SkunkCrafts Updater or manual archive),\n"
+          "BLU-fx automatically mirrors active color grading into `blu_fx.ini`.\n\n"
+          "If you roll back to v1.x (via SkunkCrafts Updater or manual archive), "
           "v1.x will seamlessly pick up your latest color grading adjustments.\n\n"
-          "*(Check this box only if you will never return to v1.x)*"
+          "*(Check this box only if you will never return to v1.x.)*"
     );
 
     // ------------------------------------------------------------------------
