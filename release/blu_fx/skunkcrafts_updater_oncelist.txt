@@ -1,4 +1,0 @@
-profiles/brat1_preferred.ini
-profiles/brat1_preferred_updated2020.ini
-profiles/brat2.ini
-profiles/blu_fx_enhanced_brat.ini

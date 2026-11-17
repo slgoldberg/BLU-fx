@@ -1058,9 +1058,9 @@ void ClearPrePresetScratchpad(void)
     sHasPrePreset = false;
 }
 
-std::string sActiveProfileName = "blu_fx.ini";
-std::string sStartupActiveProfile = "blu_fx.ini";
-std::string sSessionInitialProfile = "blu_fx.ini";
+std::string sActiveProfileName = "";
+std::string sStartupActiveProfile = "";
+std::string sSessionInitialProfile = "";
 std::string sUiMode = "sliders";
 float sUiOpacity = 0.95f;
 int sConfirmOnClose = 1; // 1 = prompt with confirmation dialog when closing with unsaved adjustments; 0 = silently keep in-memory
@@ -1285,12 +1285,9 @@ void MigrateLegacyConfigIfNeeded(void)
             SavePreferences();
             XPLMDebugString("Blu-FX: Migrated settings to profiles/ (preserved root blu_fx.ini) and created Output/preferences/blu_fx.prf\n");
         } else {
-            // Fresh install with no legacy file:
-            sActiveProfileName = "blu_fx.ini";
-            std::string destProfile = std::string(PROFILES_PATH) + "/blu_fx.ini";
-            if (stat(destProfile.c_str(), &st) != 0) {
-                SaveSettingsToFile(destProfile);
-            }
+            // Fresh install with no legacy file: start clean with identity defaults and (None) profile
+            sActiveProfileName.clear();
+            sStartupActiveProfile.clear();
             SavePreferences();
             XPLMDebugString("Blu-FX: Created default Output/preferences/blu_fx.prf\n");
         }
@@ -1448,10 +1445,15 @@ void LoadSettings(void)
 
         struct stat st;
         if (profilePath.empty() || stat(profilePath.c_str(), &st) != 0) {
-            // Fallback: look for blu_fx.ini in profiles:
-            profilePath = std::string(PROFILES_PATH) + "/blu_fx.ini";
-            if (stat(profilePath.c_str(), &st) == 0) {
-                sActiveProfileName = "blu_fx.ini";
+            // Fallback: look for blu_fx.ini in profiles ONLY IF a profile was requested or blu_fx.ini exists:
+            if (!sActiveProfileName.empty()) {
+                profilePath = std::string(PROFILES_PATH) + "/blu_fx.ini";
+                if (stat(profilePath.c_str(), &st) == 0) {
+                    sActiveProfileName = "blu_fx.ini";
+                } else {
+                    ApplyPreset(PRESET_DEFAULT);
+                    sActiveProfileName.clear();
+                }
             } else {
                 ApplyPreset(PRESET_DEFAULT);
                 sActiveProfileName.clear();

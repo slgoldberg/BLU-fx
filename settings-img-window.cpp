@@ -1206,7 +1206,7 @@ void SettingsImgWindow::buildInterface()
     } else if (!sStartupActiveProfile.empty()) {
         startupBadge = sStartupActiveProfile;
     } else {
-        startupBadge = "blu_fx.ini";
+        startupBadge = "(None)";
     }
 
     bool isAlreadyStartup = false;
@@ -1261,6 +1261,7 @@ void SettingsImgWindow::buildInterface()
             sStartupActiveProfile = currentPresetRef;
             sActiveProfileName = currentPresetRef;
             SavePreferences();
+            if (sMirrorLegacyIni) SyncLegacyIniMirror();
             UpdateDiskSnapshot();
         } else if (!s_SelectedPresetFilename.empty()) {
             // Existing user profile: save to disk and update preferences
@@ -1310,8 +1311,10 @@ void SettingsImgWindow::buildInterface()
     std::string reloadTooltip;
     if (sStartupActiveProfile.rfind("preset:", 0) == 0) {
         reloadTooltip = "Reload your configured startup preset (<badge cyan>" + sStartupActiveProfile.substr(7) + "</badge>), discarding session tweaks.\n\n*(Tip: Right-click to browse and open any `.ini` file)*";
-    } else {
+    } else if (!sStartupActiveProfile.empty()) {
         reloadTooltip = "Reload your configured startup profile (<badge emerald>" + sStartupActiveProfile + "</badge>), discarding session tweaks.\n\n*(Tip: Right-click to browse and open any `.ini` file)*";
+    } else {
+        reloadTooltip = "Reload your default neutral startup settings, discarding session tweaks.\n\n*(Tip: Right-click to browse and open any `.ini` file)*";
     }
     ImGui::TimedTooltip::TextMD(reloadTooltip.c_str());
 
@@ -1761,6 +1764,7 @@ void SettingsImgWindow::buildInterface()
                 sStartupActiveProfile = currentPresetRef;
                 sActiveProfileName = currentPresetRef;
                 SavePreferences();
+                if (sMirrorLegacyIni) SyncLegacyIniMirror();
                 UpdateDiskSnapshot();
                 mShowCloseConfirmModal = false;
                 ImGui::CloseCurrentPopup();
