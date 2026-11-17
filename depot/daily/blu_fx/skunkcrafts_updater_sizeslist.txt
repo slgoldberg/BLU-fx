@@ -1,7 +1,7 @@
-README.txt|3389
-ReleaseNotes.txt|4504
+README.txt|3542
+ReleaseNotes.txt|4946
 Version.txt|60
 docs/BLUFX_User_Guide.pdf|3230428
-lin_x64/blu_fx.xpl|3418504
-mac_x64/blu_fx.xpl|6372048
-win_x64/blu_fx.xpl|5808648
+lin_x64/blu_fx.xpl|2999560
+mac_x64/blu_fx.xpl|3029688
+win_x64/blu_fx.xpl|6031065

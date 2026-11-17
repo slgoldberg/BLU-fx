@@ -1,4 +1,7 @@
 BLU-fx -- Real-Time Color Grading for X-Plane 12 & 11
+Copyright (C) 2026 by Steven L. Goldberg (@slgoldberg)
+v2.0.0b1 (packaged on Tue Nov 17 07:28:50 UTC 2026)
+See ReleaseNotes.txt for full change history.
 ===============================================================================
 
 BLU-fx is a lightweight, real-time post-processing color grading plugin for
