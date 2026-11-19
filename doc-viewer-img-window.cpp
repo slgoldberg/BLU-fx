@@ -6,9 +6,6 @@
 #include "XPLMDisplay.h"
 #include "XPLMProcessing.h"
 
-#include "ImgWindow/contrib/ImGee/imgee_stbi_internal.h"
-#include "ImgWindow/contrib/ImGee/extensions/Markdown/imgui_markdown_image_service.h"
-
 #include <cstdio>
 #include <sys/stat.h>
 #include <algorithm>
@@ -31,220 +28,6 @@ static bool ToolbarButton(const char* label, const char* tip = nullptr, const Im
         ImGui::TimedTooltip::TextMDProxy(ImGui::GetItemID(), hovered, "%s", tip);
     }
     return clicked;
-}
-
-static ImGui::MarkdownImageData DocViewerMarkdownImageCallback(ImGui::MarkdownLinkCallbackData data)
-{
-    using namespace ImGui::MarkdownImageService;
-
-    std::string rawInput(data.link, (size_t)data.linkLength);
-    MarkdownImageModifiers mods = ParseMarkdownImageModifiers(rawInput);
-    const std::string& url = mods.clean_url;
-
-    // 1. Check disk texture cache first
-    auto& cache = GetDiskTextureCache();
-    auto it = cache.find(url);
-    if (it != cache.end() && !it->second.failed && it->second.textureID) {
-        ImGui::MarkdownImageData img;
-        img.isValid = true;
-        img.isLoading = false;
-        img.user_texture_id = it->second.textureID;
-        img.size = it->second.size;
-        ApplyMarkdownImageModifiers(img, mods, it->second.size);
-        float fontScale = ImGui::GetFontScale();
-        if (fontScale > 0.0f && std::abs(fontScale - 1.0f) > 0.01f && !mods.width_is_percent) {
-            img.size.x = std::round(img.size.x * fontScale);
-            img.size.y = std::round(img.size.y * fontScale);
-            float avail_w = ImGui::GetContentRegionAvail().x;
-            if (avail_w > 10.0f && img.size.x > avail_w) {
-                float s = avail_w / img.size.x;
-                img.size.x = avail_w;
-                img.size.y = std::round(img.size.y * s);
-            }
-        }
-        return img;
-    }
-
-    // 2. Discover file candidate on disk
-    std::string cleanUrl = url;
-    while (!cleanUrl.empty() && (cleanUrl[0] == '/' || cleanUrl[0] == '\\')) {
-        cleanUrl = cleanUrl.substr(1);
-    }
-    if (cleanUrl.rfind("./", 0) == 0) {
-        cleanUrl = cleanUrl.substr(2);
-    }
-
-    std::string baseName = cleanUrl;
-    size_t lastSlash = cleanUrl.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-        baseName = cleanUrl.substr(lastSlash + 1);
-    }
-
-    std::vector<std::string> searchDirs;
-
-    // 1. Check relative to active document location (highest precedence)
-    DocViewerImgWindow* inst = DocViewerImgWindow::GetInstance();
-    if (inst && !inst->GetDocumentPath().empty()) {
-        std::string docPath = inst->GetDocumentPath();
-        size_t s = docPath.find_last_of("/\\");
-        if (s != std::string::npos) {
-            std::string docDir = docPath.substr(0, s);
-            searchDirs.push_back(docDir);
-            searchDirs.push_back(docDir + "/images");
-            searchDirs.push_back(docDir + "/../images");
-            searchDirs.push_back(docDir + "/..");
-        }
-    }
-
-    // 2. Get plugin directories via X-Plane API
-    XPLMPluginID myId = XPLMGetMyID();
-    char pluginFilePath[512] = {0};
-    if (myId != XPLM_NO_PLUGIN_ID) {
-        XPLMGetPluginInfo(myId, nullptr, pluginFilePath, nullptr, nullptr);
-    }
-    std::string pPath(pluginFilePath);
-    size_t slash = pPath.find_last_of("/\\");
-    if (slash != std::string::npos) {
-        std::string pluginDir = pPath.substr(0, slash);
-        size_t prevSlash = pluginDir.find_last_of("/\\");
-        std::string parentDir = (prevSlash != std::string::npos) ? pluginDir.substr(0, prevSlash) : pluginDir;
-
-        searchDirs.push_back(parentDir + "/images");
-        searchDirs.push_back(parentDir + "/docs/images");
-        searchDirs.push_back(parentDir + "/docs");
-        searchDirs.push_back(parentDir);
-        searchDirs.push_back(parentDir + "/Resources");
-        searchDirs.push_back(pluginDir);
-        searchDirs.push_back(pluginDir + "/images");
-    }
-
-    // 3. X-Plane system root path
-    char sysPath[512] = {0};
-    XPLMGetSystemPath(sysPath);
-    std::string sPath(sysPath);
-    if (!sPath.empty() && sPath.back() != '/' && sPath.back() != '\\') {
-        sPath += '/';
-    }
-    if (!sPath.empty()) {
-        searchDirs.push_back(sPath + "Resources/plugins/" NAME_LOWERCASE "/images");
-        searchDirs.push_back(sPath + "Resources/plugins/" NAME_LOWERCASE "/docs/images");
-        searchDirs.push_back(sPath + "Resources/plugins/" NAME_LOWERCASE "/docs");
-        searchDirs.push_back(sPath + "Resources/plugins/" NAME_LOWERCASE);
-        searchDirs.push_back(sPath);
-    }
-
-    // Common local relative directories
-    searchDirs.push_back("Resources/plugins/" NAME_LOWERCASE "/images");
-    searchDirs.push_back("Resources/plugins/" NAME_LOWERCASE "/docs/images");
-    searchDirs.push_back("images");
-    searchDirs.push_back("docs/images");
-
-    std::string resolvedPath;
-    auto checkFile = [](const std::string& candidate) -> bool {
-        if (candidate.empty()) return false;
-        struct stat st;
-        if (stat(candidate.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
-            return true;
-        }
-        FILE* fp = fopen(candidate.c_str(), "rb");
-        if (fp) {
-            fclose(fp);
-            return true;
-        }
-        return false;
-    };
-
-    if (checkFile(url)) {
-        resolvedPath = url;
-    } else if (checkFile(cleanUrl)) {
-        resolvedPath = cleanUrl;
-    } else {
-        for (const auto& dir : searchDirs) {
-            std::string c1 = dir + "/" + cleanUrl;
-            if (checkFile(c1)) {
-                resolvedPath = c1;
-                break;
-            }
-            std::string c2 = dir + "/" + baseName;
-            if (checkFile(c2)) {
-                resolvedPath = c2;
-                break;
-            }
-        }
-    }
-
-    if (resolvedPath.empty()) {
-        static std::map<std::string, bool> s_LoggedMissing;
-        if (!s_LoggedMissing[url]) {
-            s_LoggedMissing[url] = true;
-            char msg[512];
-            snprintf(msg, sizeof(msg), "[BLU-fx] DocViewer: Image not found on disk: %s (url: %s, base: %s)\n",
-                     cleanUrl.c_str(), url.c_str(), baseName.c_str());
-            XPLMDebugString(msg);
-        }
-        MarkdownDiskTextureEntry failEntry;
-        failEntry.failed = true;
-        failEntry.inFlight = false;
-        cache[url] = failEntry;
-
-        ImGui::MarkdownImageData invalid;
-        invalid.isValid = false;
-        return invalid;
-    }
-
-    int width = 0, height = 0;
-    unsigned char* pixels = ImGeeStbi::LoadFromFile(resolvedPath.c_str(), &width, &height);
-    if (!pixels || width <= 0 || height <= 0) {
-        if (pixels) ImGeeStbi::ImageFree(pixels);
-        char msg[512];
-        snprintf(msg, sizeof(msg), "[BLU-fx] DocViewer: Failed to decode image file: %s\n", resolvedPath.c_str());
-        XPLMDebugString(msg);
-        ImGui::MarkdownImageData invalid;
-        invalid.isValid = false;
-        return invalid;
-    }
-
-    ImTextureID texID = ImgWindow::CreateTexture(pixels, width, height);
-    ImGeeStbi::ImageFree(pixels);
-
-    if (!texID) {
-        char msg[512];
-        snprintf(msg, sizeof(msg), "[BLU-fx] DocViewer: CreateTexture failed for: %s (%dx%d)\n", resolvedPath.c_str(), width, height);
-        XPLMDebugString(msg);
-        ImGui::MarkdownImageData invalid;
-        invalid.isValid = false;
-        return invalid;
-    }
-
-    char msg[512];
-    snprintf(msg, sizeof(msg), "[BLU-fx] DocViewer: Successfully loaded image %s (%dx%d)\n", resolvedPath.c_str(), width, height);
-    XPLMDebugString(msg);
-
-    MarkdownDiskTextureEntry entry;
-    entry.textureID = texID;
-    entry.size = ImVec2(static_cast<float>(width), static_cast<float>(height));
-    entry.failed = false;
-    entry.inFlight = false;
-    cache[url] = entry;
-
-    ImGui::MarkdownImageData img;
-    img.isValid = true;
-    img.isLoading = false;
-    img.user_texture_id = texID;
-    img.size = entry.size;
-    ApplyMarkdownImageModifiers(img, mods, entry.size);
-    float fontScale = ImGui::GetFontScale();
-    if (fontScale > 0.0f && std::abs(fontScale - 1.0f) > 0.01f && !mods.width_is_percent) {
-        img.size.x = std::round(img.size.x * fontScale);
-        img.size.y = std::round(img.size.y * fontScale);
-        float avail_w = ImGui::GetContentRegionAvail().x;
-        if (avail_w > 10.0f && img.size.x > avail_w) {
-            float s = avail_w / img.size.x;
-            img.size.x = avail_w;
-            img.size.y = std::round(img.size.y * s);
-        }
-    }
-    return img;
 }
 
 float DocViewerImgWindow::DeferredFlightLoopCB(float, float, int, void*)
@@ -334,8 +117,6 @@ static const char* s_FallbackMarkdown =
     "---\n\n"
     "*(Full documentation with embedded illustrations is available in the docs/ folder)*\n";
 
-static void RegisterCalloutMarkdownTag();
-
 static WindowGeometry CalcDefaultDocViewerGeometry()
 {
     int screenL = 0, screenT = 0, screenR = 0, screenB = 0;
@@ -399,7 +180,6 @@ DocViewerImgWindow::DocViewerImgWindow()
     mHasSavedSimGeometry = _simBaselineRect.valid;
 
     ImGui::MarkdownImageService::ClearTextureCache();
-    RegisterCalloutMarkdownTag();
     loadDocument();
     UpdateMenuCheckmarks();
 }
@@ -451,200 +231,7 @@ void DocViewerImgWindow::ReloadDocument()
 {
     mLoaded = false;
     ImGui::MarkdownImageService::ClearTextureCache();
-    RegisterCalloutMarkdownTag();
     loadDocument();
-}
-
-static void RegisterCalloutMarkdownTag()
-{
-    static bool s_registered = false;
-    if (s_registered) return;
-    s_registered = true;
-
-    auto calloutHandler = [](const std::string& inner_text, const std::string& param) {
-        float fontScale = ImGui::GetFontScale();
-        float scale = (fontScale > 0.0f) ? fontScale : 1.0f;
-        float avail_w = ImGui::GetContentRegionAvail().x;
-        if (avail_w < 60.0f) avail_w = 60.0f;
-
-        // Parse type parameter: e.g. "type=tip" or "tip"
-        std::string type = "note";
-        size_t eq = param.find('=');
-        if (eq != std::string::npos) {
-            type = param.substr(eq + 1);
-        } else if (!param.empty()) {
-            type = param;
-        }
-        for (char& c : type) c = (char)tolower((unsigned char)c);
-        while (!type.empty() && (type.back() == ' ' || type.back() == '\t')) type.pop_back();
-
-        // Color theme for alert types:
-        ImU32 accent_col = IM_COL32(59, 130, 246, 255);  // Default blue (TIP)
-        ImU32 bg_col     = IM_COL32(30, 58, 138, 55);    // Subtle translucent tint
-        const char* icon = ICON_FA_LIGHTBULB;
-        std::string label = "TIP";
-
-        if (type == "note" || type == "info") {
-            accent_col = IM_COL32(99, 102, 241, 255); // Indigo
-            bg_col     = IM_COL32(49, 46, 129, 55);
-            icon       = ICON_FA_INFO_CIRCLE;
-            label      = "NOTE";
-        } else if (type == "warning") {
-            accent_col = IM_COL32(245, 158, 11, 255); // Amber
-            bg_col     = IM_COL32(120, 53, 15, 55);
-            icon       = ICON_FA_EXCLAMATION_TRIANGLE;
-            label      = "WARNING";
-        } else if (type == "important") {
-            accent_col = IM_COL32(168, 85, 247, 255); // Purple
-            bg_col     = IM_COL32(88, 28, 135, 55);
-            icon       = ICON_FA_EXCLAMATION_CIRCLE;
-            label      = "IMPORTANT";
-        } else if (type == "caution") {
-            accent_col = IM_COL32(239, 68, 68, 255);  // Red
-            bg_col     = IM_COL32(127, 29, 29, 55);
-            icon       = ICON_FA_MINUS_CIRCLE;
-            label      = "CAUTION";
-        }
-
-        // Layout metrics:
-        float bar_w    = 4.0f * scale;
-        float pad_x    = 14.0f * scale;
-        float pad_y    = 10.0f * scale;
-        float inset_x  = 2.0f * scale;
-        float rounding = 4.0f * scale;
-
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        ImDrawListSplitter splitter;
-        splitter.Split(dl, 2);
-        splitter.SetCurrentChannel(dl, 1); // Channel 1: Foreground content
-
-        ImVec2 start_pos = ImGui::GetCursorScreenPos();
-        start_pos.x += inset_x;
-
-        // Position cursor inside the callout padding:
-        ImGui::SetCursorScreenPos(ImVec2(start_pos.x + bar_w + pad_x, start_pos.y + pad_y));
-        ImGui::BeginGroup();
-
-        // 1. Header with icon and badge title:
-        ImGui::PushStyleColor(ImGuiCol_Text, accent_col);
-        ImGui::Text("%s %s", icon, label.c_str());
-        ImGui::PopStyleColor();
-
-        ImGui::Spacing();
-
-        // 2. Wrapped inner markdown content:
-        float inner_avail_w = ImMax(60.0f, avail_w - (inset_x * 2.0f + bar_w + pad_x * 2.0f));
-        ImGui::MarkdownConfig localCfg;
-        localCfg.wrapWidth = inner_avail_w;
-        localCfg.imageCallback = DocViewerMarkdownImageCallback;
-
-        std::string clean_content = inner_text;
-        while (!clean_content.empty() && (clean_content.front() == '\n' || clean_content.front() == '\r' || clean_content.front() == ' ')) clean_content.erase(0, 1);
-        while (!clean_content.empty() && (clean_content.back() == '\n' || clean_content.back() == '\r' || clean_content.back() == ' ')) clean_content.pop_back();
-
-        ImGui::Markdown::TextWrapped(clean_content, inner_avail_w, &localCfg);
-
-        ImGui::EndGroup();
-
-        ImVec2 content_max = ImGui::GetItemRectMax();
-        ImVec2 box_min = start_pos;
-        ImVec2 box_max = ImVec2(start_pos.x + avail_w - inset_x * 2.0f, content_max.y + pad_y);
-
-        // Channel 0: Background rectangle and left vertical accent bar:
-        splitter.SetCurrentChannel(dl, 0);
-        dl->AddRectFilled(box_min, box_max, bg_col, rounding);
-        dl->AddRectFilled(
-            box_min,
-            ImVec2(box_min.x + bar_w, box_max.y),
-            accent_col,
-            rounding,
-            ImDrawFlags_RoundCornersLeft
-        );
-        dl->AddRect(box_min, box_max, IM_COL32(255, 255, 255, 25), rounding);
-
-        splitter.Merge(dl);
-
-        // Advance cursor past the callout block with standard item spacing:
-        float itemSpacingY = ImGui::GetStyle().ItemSpacing.y;
-        ImGui::SetCursorScreenPos(ImVec2(start_pos.x - inset_x, box_max.y + itemSpacingY));
-    };
-
-    ImGui::RegisterMarkdownTag("callout", calloutHandler);
-    ImGui::RegisterMarkdownTag("notice",  calloutHandler);
-    ImGui::RegisterMarkdownTag("alert",   calloutHandler);
-}
-
-static std::string PreprocessMarkdownAlerts(const std::string& input)
-{
-    std::stringstream in(input);
-    std::stringstream out;
-    std::string line;
-    bool inAlert = false;
-    std::string alertType = "tip";
-    std::vector<std::string> alertLines;
-
-    auto flushAlert = [&]() {
-        if (!inAlert) return;
-        out << "<callout type=" << alertType << ">\n";
-        for (const auto& l : alertLines) {
-            out << l << "\n";
-        }
-        out << "</callout>\n";
-        inAlert = false;
-        alertType = "tip";
-        alertLines.clear();
-    };
-
-    while (std::getline(in, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-
-        // Check for GFM Alert start: > [!TIP], > [!NOTE], > [!WARNING], > [!IMPORTANT], > [!CAUTION]
-        if (line.rfind("> [!", 0) == 0 || line.rfind(">[!", 0) == 0) {
-            flushAlert();
-            size_t closeB = line.find(']');
-            if (closeB != std::string::npos) {
-                size_t startType = (line[1] == ' ') ? 4 : 3;
-                std::string type = line.substr(startType, closeB - startType);
-                for (char& c : type) c = (char)tolower((unsigned char)c);
-                inAlert = true;
-                alertType = type;
-
-                std::string rem = line.substr(closeB + 1);
-                while (!rem.empty() && (rem.front() == ' ' || rem.front() == '\t')) rem.erase(0, 1);
-                if (!rem.empty()) {
-                    alertLines.push_back(rem);
-                }
-                continue;
-            }
-        }
-
-        if (inAlert) {
-            if (line.rfind("> ", 0) == 0) {
-                alertLines.push_back(line.substr(2));
-                continue;
-            } else if (line == ">") {
-                alertLines.push_back("");
-                continue;
-            } else if (line.rfind(">", 0) == 0) {
-                alertLines.push_back(line.substr(1));
-                continue;
-            } else {
-                flushAlert();
-                // fall through to process normal line
-            }
-        }
-
-        // Generic blockquote: > Text
-        if (line.rfind("> ", 0) == 0) {
-            out << line.substr(2) << "\n";
-            continue;
-        }
-
-        out << line << "\n";
-    }
-
-    flushAlert();
-    return out.str();
 }
 
 void DocViewerImgWindow::loadDocument()
@@ -706,7 +293,7 @@ void DocViewerImgWindow::loadDocument()
                 buf.resize(sz);
                 size_t readBytes = fread(&buf[0], 1, sz, fp);
                 buf.resize(readBytes);
-                mContent = PreprocessMarkdownAlerts(buf);
+                mContent = std::move(buf);
                 mLoaded = true;
                 fclose(fp);
                 return;
@@ -716,7 +303,7 @@ void DocViewerImgWindow::loadDocument()
     }
 
     // Fallback:
-    mContent = PreprocessMarkdownAlerts(s_FallbackMarkdown);
+    mContent = s_FallbackMarkdown;
     mLoaded = true;
 }
 
@@ -1078,7 +665,23 @@ void DocViewerImgWindow::drawContent()
     if (defCfg) {
         mdConfig = *defCfg;
     }
-    mdConfig.imageCallback = DocViewerMarkdownImageCallback;
+
+    std::string docDir;
+    if (!mDocumentPath.empty()) {
+        size_t s = mDocumentPath.find_last_of("/\\");
+        if (s != std::string::npos) {
+            docDir = mDocumentPath.substr(0, s);
+        }
+    }
+    if (!docDir.empty()) {
+        mdConfig.baseDir = docDir.c_str();
+    }
+
+    mdConfig.imageCallback = &ImGui::MarkdownImageService::DefaultMarkdownImageCallback;
+    mdConfig.enableImageLightbox = true;
+    mdConfig.showImageCaptions = true;
+    mdConfig.enableTableTooltips = true;
+
     // Use dynamic content-region wrap (0.0f) so Dear ImGui automatically accounts
     // for bullet indents, nested lists, and scrollbars without text overshooting the margin:
     mdConfig.wrapWidth = 0.0f;

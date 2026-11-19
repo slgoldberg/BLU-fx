@@ -1,6 +1,6 @@
 # BLU-fx User Guide
 
-![BluFX Cinematic Color Grading](images/blufx_hero_banner.jpg =80%)
+![BluFX Cinematic Color Grading](images/blufx_hero_banner.jpg =80% center lightbox nocaption)
 
 **BLU-fx** is a lightweight, real-time post-processing color grading plugin for X-Plane 12 and X-Plane 11 across macOS, Windows, and Linux. It allows you to customize scene brightness, contrast, color temperature, and atmospheric styling with zero noticeable impact on flight simulator framerates.
 
@@ -17,7 +17,7 @@ Getting started with BLU-fx takes less than a minute:
 3. In the **Presets** section at the bottom, click any preset (such as **Shiny California**, **High Dynamic Range**, or **Cold Winter**) to immediately transform your simulator scenery.
 4. By default, BLU-fx opens in **Split** preview mode, showing your raw X-Plane scenery on the left half of the screen and the color grade on the right half. Drag the **Wipe** slider back and forth to compare before and after!
 
-![BLU-fx In-Cockpit Overview](images/ui_overview.png =68%)
+![BLU-fx In-Cockpit Overview](images/ui_overview.png =68% center lightbox)
 
 ## 2. What's New & Upgrading from Previous Versions
 
@@ -60,8 +60,7 @@ When running BLU-fx under X-Plane 12, you will notice a few adjustments compared
 
 When tuning visual styles, you want to see exactly how your adjustments affect terrain, clouds, and cockpit instruments without guessing. BLU-fx provides a non-destructive live preview system built directly into the settings header:
 
-![Live Preview Split Screen](images/split_preview_demo.png =72%)
-*Live split preview comparing raw X-Plane scenery (left) against the **Extra Gloomy** preset with hairline divider (right).*
+![Live Preview Split Screen](images/split_preview_demo.png =72% center lightbox caption="Live split preview comparing raw X-Plane scenery (left) against the **Extra Gloomy** preset with hairline divider (right).")
 
 ### Preview Modes: [ Full | Split ]
 - **Split Mode:** Divides your simulator display into two halves. The left side displays your unmodified X-Plane rendering, while the right side applies your active color grading profile in real time.
