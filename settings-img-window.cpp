@@ -83,6 +83,8 @@ bool InitializeImGui()
                         ICON_FA_ARROWS_ALT_H
                         ICON_FA_ARROWS_ALT_V
                         ICON_FA_ASTERISK
+                        ICON_FA_BOOK
+                        ICON_FA_BOOK_OPEN
                         ICON_FA_CAMERA
                         ICON_FA_CARET_DOWN
                         ICON_FA_CARET_LEFT
@@ -1602,9 +1604,8 @@ void SettingsImgWindow::buildInterface()
 
     ImGui::PopStyleVar(2);
     ImGui::PopStyleColor(4);
-    if (IM_SMALLER_FONT) ImGui::PopFont();
 
-    // TimedTooltip invoked in clean ambient font environment:
+    // TimedTooltip invoked for checkbox:
     ImGui::TimedTooltip::TextMD(disableMirror
         ? "**Legacy Downgrade Compatibility: DISABLED**\n"
           "BLU-fx will no longer update `blu_fx.ini` in the plugin root.\n\n"
@@ -1615,6 +1616,38 @@ void SettingsImgWindow::buildInterface()
           "v1.x will seamlessly pick up your latest color grading adjustments.\n\n"
           "*(Check this box only if you will never return to v1.x.)*"
     );
+
+    float cbEndX = ImGui::GetItemRectMax().x;
+
+    // Right-aligned User Guide Window toggle button:
+    bool docOpen = DocViewerImgWindow::IsOpen();
+    const char* docLabel = docOpen ? (ICON_FA_BOOK_OPEN " Close User Guide") : (ICON_FA_BOOK " User Guide Window");
+    float docBtnW = ImGui::CalcTextSize(docLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    float rightX = ImGui::GetWindowWidth() - docBtnW - ImGui::GetStyle().WindowPadding.x;
+
+    if (rightX > cbEndX + 12.0f) {
+        ImGui::SameLine(rightX);
+    } else {
+        ImGui::NewLine();
+        ImGui::SameLine(std::max(0.0f, rightX));
+    }
+
+    ImVec4 linkCol = docOpen ? ImVec4(0.55f, 0.82f, 1.00f, 0.95f) : ImVec4(0.78f, 0.85f, 0.95f, 0.90f);
+    ImGui::PushStyleColor(ImGuiCol_Text, linkCol);
+    if (ImGui::SmallButtonLink(docLabel)) {
+        DocViewerImgWindow::ToggleInstance();
+    }
+    ImGui::PopStyleColor();
+
+    ImGui::TimedTooltip::TextMD(docOpen
+        ? "**Close User Guide Window:**\n\n"
+          "The illustrated User Guide is currently open in X-Plane. Click here to close it."
+        : "**BLU-fx User Guide Window:**\n\n"
+          "Opens the interactive, illustrated user manual right here inside X-Plane as a window -- "
+          "no need to leave the simulator or open an external PDF viewer!"
+    );
+
+    if (IM_SMALLER_FONT) ImGui::PopFont();
 
     // ------------------------------------------------------------------------
     // Legacy XP11 Sections (Raleigh Scale, FPS-Limiter, Cinema Verite)
