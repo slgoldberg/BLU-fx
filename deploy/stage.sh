@@ -114,7 +114,7 @@ stage_channel() {
 
     # 4. Build depot manifests via xpdepot.py
     if [[ "$BUILD_DEPOT" == true ]]; then
-        local DEPOT_DIR="$REPO_ROOT/build/depot/depot/$CHANNEL/blu_fx"
+        local DEPOT_DIR="$REPO_ROOT/build/depot/$CHANNEL/blu_fx"
         echo "==> Generating depot manifests for: $CHANNEL"
         mkdir -p "$DEPOT_DIR"
         python3 "$REPO_ROOT/deploy/xpdepot.py" --stage "$STAGING_DIR" --depot "$DEPOT_DIR"

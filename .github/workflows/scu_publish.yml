@@ -136,7 +136,7 @@ jobs:
           BLUFX_VERSION: ${{ needs.build.outputs.blufx_version }}
           PUBLISH_ACTION: ${{ inputs.action }}
         run: |
-          STAGE_DEPOT_ROOT="$PWD/build/depot/depot"
+          STAGE_DEPOT_ROOT="$PWD/build/depot"
           cd gh-pages-tree
 
           DAILY_DIR="depot/daily/blu_fx"
