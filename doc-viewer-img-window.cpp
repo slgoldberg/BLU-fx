@@ -163,7 +163,7 @@ DocViewerImgWindow::DocViewerImgWindow()
     if (sDocViewerOpacity >= 0.10f && sDocViewerOpacity <= 1.00f) {
         SetWindowOpacity(sDocViewerOpacity);
     }
-    GetViewerState().transparent_hud = (sDocViewerTransparent != 0);
+    SetTransparentHud(sDocViewerTransparent != 0);
 
     UpdateMenuCheckmarks();
 }
