@@ -1,3 +1,32 @@
+BLU-fx v2.0.0b2  (packaged on Thu Nov 19 2026)
+===============================================================================
+
+HIGHLIGHTS FOR THIS RELEASE (v2.0.0b2):
+
+  * Native ImGee GFM Alert Callout Cards:
+    - User Guide now features native GitHub Flavored Markdown alert cards
+      (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]).
+    - Each callout renders with dedicated theme-aware accents, backgrounds,
+      and vector iconography powered by ImGee's procedural rendering engine.
+
+  * Click-to-Enlarge Markdown Image Lightbox:
+    - Clicking any User Guide illustration opens an in-context, aspect-fit
+      zoom lightbox clamped directly to the window canvas.
+    - Deepened dimmer overlay and dedicated high-contrast backing plates behind
+      figure captions for crystal-clear readability over document text.
+    - Robust release-dismissal hit-shielding: clicking anywhere outside the image
+      or pressing Esc dismisses the lightbox cleanly without click-through loops.
+
+  * Zero-Bias Procedural Vector Icons:
+    - Completely eliminated Dear ImGui half-pixel line bias across all vector glyphs,
+      ensuring perfectly symmetric, upright exclamation marks, dots, and a newly
+      refined lightbulb silhouette.
+
+  * UI & Tooltip Polish:
+    - Full TimedTooltip click-to-toggle support across status indicators.
+    - Active cursor affordances (Hand for links/triggers, ResizeNS for menus).
+
+===============================================================================
 BLU-fx v2.0.0b1  (packaged on Mon Nov 16 2026)
 ===============================================================================
 
