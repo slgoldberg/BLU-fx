@@ -19,8 +19,6 @@ Getting started with BLU-fx takes less than a minute:
 3. In the **Presets** section at the bottom, click any preset (such as **Shiny California**, **High Dynamic Range**, or **Cold Winter**) to immediately transform your simulator scenery.
 4. By default, BLU-fx opens in **Split** preview mode, showing your raw X-Plane scenery on the left half of the screen and the color grade on the right half. Drag the **Wipe** slider back and forth to compare before and after!
 
-<br clear="all"/>
-
 ---
 
 ## 2. What's New & Upgrading from Previous Versions
@@ -82,8 +80,6 @@ Click the **eye icon** button beside the wipe slider to toggle the split boundar
 
 ### Momentary Full View
 In Split mode, you can click and hold the **Hold for Full View** button in the upper right. While held down, your full screen displays the active color grade; releasing the mouse immediately snaps back to your split-screen view.
-
-<br clear="all"/>
 
 > [!TIP]
 > **Pilot ProTip:** You can assign this same momentary check to a physical joystick paddle or keyboard shortcut using the command `blu_fx/post_processing/momentary`.
