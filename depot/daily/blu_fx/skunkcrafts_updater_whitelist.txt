@@ -1,12 +1,12 @@
-README.txt|488086622
+README.txt|1901609702
 ReleaseNotes.txt|4260832277
-Version.txt|3910416892
+Version.txt|3021473463
 docs/BLUFX_User_Guide.md|2124368909
-docs/BLUFX_User_Guide.pdf|689271473
+docs/BLUFX_User_Guide.pdf|888131806
 docs/images/blufx_hero_banner.jpg|2915792597
 docs/images/blufx_hero_banner_opt.jpg|2527573452
 docs/images/split_preview_demo.png|1828428296
 docs/images/ui_overview.png|1600382179
 lin_x64/blu_fx.xpl|1807041742
 mac_x64/blu_fx.xpl|2591934500
-win_x64/blu_fx.xpl|3864371070
+win_x64/blu_fx.xpl|2444680297
