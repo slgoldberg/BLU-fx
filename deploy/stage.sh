@@ -59,9 +59,9 @@ stage_channel() {
     if [[ -f "$RELEASE_SRC/ReleaseNotes.txt" ]]; then
         cp -a "$RELEASE_SRC/ReleaseNotes.txt" "$STAGING_DIR/"
     fi
-    if [[ -f "$REPO_ROOT/docs/BLUFX_User_Guide.pdf" ]]; then
+    if [[ -d "$REPO_ROOT/docs" ]]; then
         mkdir -p "$STAGING_DIR/docs"
-        cp -a "$REPO_ROOT/docs/BLUFX_User_Guide.pdf" "$STAGING_DIR/docs/"
+        cp -a "$REPO_ROOT/docs/"* "$STAGING_DIR/docs/"
     fi
     if [[ -d "$REPO_ROOT/profiles" ]]; then
         mkdir -p "$STAGING_DIR/profiles"

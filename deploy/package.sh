@@ -49,8 +49,9 @@ cp -a "$REPO_ROOT/release/blu_fx/ReleaseNotes.txt" "$DIST_DIR/"
     tail -n +4 "$REPO_ROOT/release/blu_fx/README.txt"
 } > "$DIST_DIR/README.txt"
 
-if [[ -f "$REPO_ROOT/docs/BLUFX_User_Guide.pdf" ]]; then
-    cp -a "$REPO_ROOT/docs/BLUFX_User_Guide.pdf" "$DIST_DIR/docs/"
+if [[ -d "$REPO_ROOT/docs" ]]; then
+    mkdir -p "$DIST_DIR/docs"
+    cp -a "$REPO_ROOT/docs/"* "$DIST_DIR/docs/"
 fi
 
 # Copy starter profiles
