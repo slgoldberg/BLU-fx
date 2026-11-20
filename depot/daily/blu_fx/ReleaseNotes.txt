@@ -3,6 +3,13 @@ BLU-fx v2.0.0b2  (packaged on Thu Nov 19 2026)
 
 HIGHLIGHTS FOR THIS RELEASE (v2.0.0b2):
 
+  * In-Simulator User Guide Window (ImGee v1.1.0 & ImgDocWindow):
+    - Added a dedicated "User Guide Window" button directly in the Settings window
+      footer (bottom right), making the complete illustrated manual instantly
+      accessible right inside X-Plane without leaving the simulator or opening a PDF.
+    - Features full 2-row document viewer chrome: zoom slider, table-of-contents
+      navigation, transparency controls, and live hot-reloading.
+
   * Native ImGee GFM Alert Callout Cards:
     - User Guide now features native GitHub Flavored Markdown alert cards
       (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]).
