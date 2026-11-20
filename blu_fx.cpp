@@ -1072,6 +1072,9 @@ int sDocViewerTop = -1;
 int sDocViewerWidth = 0;
 int sDocViewerHeight = 0;
 float sDocViewerZoom = 1.0f;
+int sDocViewerTheme = 0;
+float sDocViewerOpacity = 0.80f;
+int sDocViewerTransparent = 1;
 int sPreviewMode = PREVIEW_MODE_SPLIT;
 float sPreviewSplitPosition = 0.50f;
 bool sMomentaryFullView = false;
@@ -1145,6 +1148,9 @@ bool SavePreferences(void)
         fprintf(fp, "docViewerWidth=%d\n", sDocViewerWidth);
         fprintf(fp, "docViewerHeight=%d\n", sDocViewerHeight);
         fprintf(fp, "docViewerZoom=%.2f\n", sDocViewerZoom);
+        fprintf(fp, "docViewerTheme=%d\n", sDocViewerTheme);
+        fprintf(fp, "docViewerOpacity=%.2f\n", sDocViewerOpacity);
+        fprintf(fp, "docViewerTransparent=%d\n", sDocViewerTransparent);
     }
     fprintf(fp, "previewMode=%s\n", (sPreviewMode == PREVIEW_MODE_FULL ? "full" : "split"));
     fprintf(fp, "previewSplit=%.2f\n", sPreviewSplitPosition);
@@ -1228,7 +1234,16 @@ bool LoadPreferences(void)
         } else if (strcmp(key, "docViewerZoom") == 0) {
             sDocViewerZoom = (float)atof(val);
             if (sDocViewerZoom < 0.50f) sDocViewerZoom = 0.50f;
-            if (sDocViewerZoom > 2.00f) sDocViewerZoom = 2.00f;
+            if (sDocViewerZoom > 2.50f) sDocViewerZoom = 2.50f;
+        } else if (strcmp(key, "docViewerTheme") == 0) {
+            sDocViewerTheme = atoi(val);
+            if (sDocViewerTheme < 0 || sDocViewerTheme >= 5) sDocViewerTheme = 0;
+        } else if (strcmp(key, "docViewerOpacity") == 0) {
+            sDocViewerOpacity = (float)atof(val);
+            if (sDocViewerOpacity < 0.10f) sDocViewerOpacity = 0.10f;
+            if (sDocViewerOpacity > 1.00f) sDocViewerOpacity = 1.00f;
+        } else if (strcmp(key, "docViewerTransparent") == 0) {
+            sDocViewerTransparent = (atoi(val) != 0) ? 1 : 0;
         } else if (strcmp(key, "previewMode") == 0) {
             sPreviewMode = (strcmp(val, "full") == 0) ? PREVIEW_MODE_FULL : PREVIEW_MODE_SPLIT;
         } else if (strcmp(key, "previewSplit") == 0) {

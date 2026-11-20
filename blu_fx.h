@@ -201,12 +201,15 @@ void SyncLegacyIniMirror(void);
 extern int sWindowLeft;
 extern int sWindowTop;
 
-// User Guide (DocViewer) persistent preferences (in-simulator boxels & zoom):
+// User Guide (DocViewer) persistent preferences (in-simulator boxels, zoom, theme & opacity):
 extern int sDocViewerLeft;
 extern int sDocViewerTop;
 extern int sDocViewerWidth;
 extern int sDocViewerHeight;
 extern float sDocViewerZoom;
+extern int sDocViewerTheme;
+extern float sDocViewerOpacity;
+extern int sDocViewerTransparent;
 
 std::string GetPrefsFilePath(void);
 bool LoadPreferences(void);
