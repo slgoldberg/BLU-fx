@@ -10,6 +10,8 @@ _Yes, it works on <u>all</u> X-Plane configurations from X-Plane 11 through the 
 
 ## 1. Quick Start
 
+<img src="images/ui_overview.png" align="right" width="235" lightbox="true" alt="BLU-fx Settings window -- click to enlarge & zoom" caption="BLU-fx Settings window in X-Plane (click to inspect in Lightbox)."/>
+
 Getting started with BLU-fx takes less than a minute:
 
 1. Open the simulator menu and select `Plugins > BLU-fx > Settings window` (or press the configured keyboard shortcut, if you have defined one).
@@ -17,7 +19,9 @@ Getting started with BLU-fx takes less than a minute:
 3. In the **Presets** section at the bottom, click any preset (such as **Shiny California**, **High Dynamic Range**, or **Cold Winter**) to immediately transform your simulator scenery.
 4. By default, BLU-fx opens in **Split** preview mode, showing your raw X-Plane scenery on the left half of the screen and the color grade on the right half. Drag the **Wipe** slider back and forth to compare before and after!
 
-![BLU-fx In-Cockpit Overview](images/ui_overview.png =68% center lightbox)
+<br clear="all"/>
+
+---
 
 ## 2. What's New & Upgrading from Previous Versions
 
@@ -58,9 +62,9 @@ When running BLU-fx under X-Plane 12, you will notice a few adjustments compared
 
 ## 3. Live Preview Controls
 
-When tuning visual styles, you want to see exactly how your adjustments affect terrain, clouds, and cockpit instruments without guessing. BLU-fx provides a non-destructive live preview system built directly into the settings header:
+<img src="images/split_preview_demo.png" align="right" width="290" lightbox="true" alt="Live split preview -- click to inspect & zoom in Lightbox" caption="Live split preview: raw scenery (left) vs. Extra Gloomy preset with hairline divider (right)."/>
 
-![Live Preview Split Screen](images/split_preview_demo.png =72% center lightbox caption="Live split preview comparing raw X-Plane scenery (left) against the **Extra Gloomy** preset with hairline divider (right).")
+When tuning visual styles, you want to see exactly how your adjustments affect terrain, clouds, and cockpit instruments without guessing. BLU-fx provides a non-destructive live preview system built directly into the settings header:
 
 ### Preview Modes: [ Full | Split ]
 - **Split Mode:** Divides your simulator display into two halves. The left side displays your unmodified X-Plane rendering, while the right side applies your active color grading profile in real time.
@@ -78,6 +82,8 @@ Click the **eye icon** button beside the wipe slider to toggle the split boundar
 
 ### Momentary Full View
 In Split mode, you can click and hold the **Hold for Full View** button in the upper right. While held down, your full screen displays the active color grade; releasing the mouse immediately snaps back to your split-screen view.
+
+<br clear="all"/>
 
 > [!TIP]
 > **Pilot ProTip:** You can assign this same momentary check to a physical joystick paddle or keyboard shortcut using the command `blu_fx/post_processing/momentary`.

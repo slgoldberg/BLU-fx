@@ -801,85 +801,111 @@ def parse_markdown_to_flowables(md_content: str, styles, is_first_doc: bool = Fa
             i += 1
             continue
 
-        # Centered block wrapper tags (<center>, </center>, <centre>, </centre>)
-        if re.match(r'^\s*</?cent(?:er|re)>\s*$', line, re.IGNORECASE):
+        # Centered block wrapper tags (<center>, </center>, <centre>, </centre>) and clear tags (<br clear="all"/>, <clear/>)
+        if re.match(r'^\s*(?:</?cent(?:er|re)>|<br\s+clear=["\']?all["\']?\s*/?>|<clear\s*/?>|<!--\s*clear\s*-->)\s*$', line, re.IGNORECASE):
             i += 1
             continue
 
-        # Markdown Images: ![Caption](path/to/image.png), ![Caption](<path/to/image.png =50%>), or trailing { width=... }
+        # Markdown Images: ![Caption](path/to/image.png) or HTML <img src="..." .../>
         clean_img_line = re.sub(r'</?cent(?:er|re)>', '', line, flags=re.IGNORECASE).strip()
         img_match = re.match(r'^\s*!\[([^\]]*)\]\(([^)]+)\)(?:\{([^}]*)\})?\s*$', clean_img_line)
-        if img_match:
+        html_img_match = re.match(r'^\s*<img\s+([^>]+)/?>\s*$', clean_img_line, re.IGNORECASE) if not img_match else None
+
+        if img_match or html_img_match:
             if in_alert: flush_alert()
             if in_table: flush_table()
-            caption_text = img_match.group(1).strip()
-            img_target = img_match.group(2).strip()
-            attr_block = (img_match.group(3) or "").strip()
-
-            # Unwrap optional CommonMark angle brackets: e.g. "<images/pic.png =50%>" or "<images/pic.png> =50%"
-            extra_tokens = []
-            if img_target.startswith('<') and '>' in img_target:
-                gt_idx = img_target.find('>')
-                inner_target = img_target[1:gt_idx].strip()
-                after_gt = img_target[gt_idx + 1:].strip()
-                if after_gt:
-                    extra_tokens.extend(after_gt.split())
-                img_target = inner_target
-
-            raw_parts = img_target.split()
-            tail_mods = []
-            while len(raw_parts) > 1 and (
-                raw_parts[-1].startswith('=')
-                or raw_parts[-1].lower().startswith(('width=', 'w=', 'height=', 'h='))
-            ):
-                tail_mods.insert(0, raw_parts.pop())
-            img_rel_path = " ".join(raw_parts) if raw_parts else ""
-            mod_tokens = tail_mods + extra_tokens + (attr_block.split() if attr_block else [])
 
             pct_mod = None
             px_w_mod = None
             px_h_mod = None
-            for tok in mod_tokens:
-                t = tok.strip()
-                if t.startswith('='):
-                    dim = t[1:].strip()
-                    if dim.endswith('%'):
-                        try:
-                            pct_mod = float(dim[:-1]) / 100.0
-                        except ValueError:
-                            pass
-                    elif 'x' in dim.lower():
-                        sw, sh = dim.lower().split('x', 1)
-                        try:
-                            if sw: px_w_mod = float(sw)
-                            if sh: px_h_mod = float(sh)
-                        except ValueError:
-                            pass
+
+            if html_img_match:
+                attrs = html_img_match.group(1)
+                src_m = re.search(r'src=["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+                img_rel_path = src_m.group(1).strip() if src_m else ""
+                cap_m = re.search(r'(?:caption|alt)=["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+                caption_text = cap_m.group(1).strip() if cap_m else ""
+                width_m = re.search(r'width=["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+                if width_m:
+                    w_val = width_m.group(1).strip()
+                    if w_val.endswith('%'):
+                        try: pct_mod = float(w_val[:-1]) / 100.0
+                        except ValueError: pass
                     else:
-                        try:
-                            px_w_mod = float(dim)
-                        except ValueError:
-                            pass
-                elif t.lower().startswith(('width=', 'w=')):
-                    val = t.split('=', 1)[1].strip('"\'')
-                    if val.endswith('%'):
-                        try:
-                            pct_mod = float(val[:-1]) / 100.0
-                        except ValueError:
-                            pass
-                    else:
+                        w_val = re.sub(r'px$', '', w_val, flags=re.IGNORECASE)
+                        try: px_w_mod = float(w_val)
+                        except ValueError: pass
+            else:
+                caption_text = img_match.group(1).strip()
+                img_target = img_match.group(2).strip()
+                attr_block = (img_match.group(3) or "").strip()
+
+                # Unwrap optional CommonMark angle brackets: e.g. "<images/pic.png =50%>" or "<images/pic.png> =50%"
+                extra_tokens = []
+                if img_target.startswith('<') and '>' in img_target:
+                    gt_idx = img_target.find('>')
+                    inner_target = img_target[1:gt_idx].strip()
+                    after_gt = img_target[gt_idx + 1:].strip()
+                    if after_gt:
+                        extra_tokens.extend(after_gt.split())
+                    img_target = inner_target
+
+                raw_parts = img_target.split()
+                tail_mods = []
+                known_modifiers = {
+                    'center', 'centered', 'centre', 'left', 'right', 'lightbox', 'nocaption',
+                    'nofloat', 'border', 'noborder', 'pixelated', 'smooth', 'fit', 'autofit'
+                }
+                while len(raw_parts) > 1 and (
+                    raw_parts[-1].startswith('=')
+                    or raw_parts[-1].lower().startswith(('width=', 'w=', 'height=', 'h=', 'caption=', 'alt=', 'align=', 'float=', 'gap=', 'margin='))
+                    or raw_parts[-1].lower() in known_modifiers
+                ):
+                    tail_mods.insert(0, raw_parts.pop())
+                img_rel_path = " ".join(raw_parts) if raw_parts else ""
+                mod_tokens = tail_mods + extra_tokens + (attr_block.split() if attr_block else [])
+
+                for tok in mod_tokens:
+                    t = tok.strip()
+                    if t.startswith('='):
+                        dim = t[1:].strip()
+                        if dim.endswith('%'):
+                            try:
+                                pct_mod = float(dim[:-1]) / 100.0
+                            except ValueError:
+                                pass
+                        elif 'x' in dim.lower():
+                            sw, sh = dim.lower().split('x', 1)
+                            try:
+                                if sw: px_w_mod = float(sw)
+                                if sh: px_h_mod = float(sh)
+                            except ValueError:
+                                pass
+                        else:
+                            try:
+                                px_w_mod = float(dim)
+                            except ValueError:
+                                pass
+                    elif t.lower().startswith(('width=', 'w=')):
+                        val = t.split('=', 1)[1].strip('"\'')
+                        if val.endswith('%'):
+                            try:
+                                pct_mod = float(val[:-1]) / 100.0
+                            except ValueError:
+                                pass
+                        else:
+                            val = re.sub(r'px$', '', val, flags=re.IGNORECASE)
+                            try:
+                                px_w_mod = float(val)
+                            except ValueError:
+                                pass
+                    elif t.lower().startswith(('height=', 'h=')):
+                        val = t.split('=', 1)[1].strip('"\'')
                         val = re.sub(r'px$', '', val, flags=re.IGNORECASE)
                         try:
-                            px_w_mod = float(val)
+                            px_h_mod = float(val)
                         except ValueError:
                             pass
-                elif t.lower().startswith(('height=', 'h=')):
-                    val = t.split('=', 1)[1].strip('"\'')
-                    val = re.sub(r'px$', '', val, flags=re.IGNORECASE)
-                    try:
-                        px_h_mod = float(val)
-                    except ValueError:
-                        pass
 
             if base_dir and not os.path.isabs(img_rel_path):
                 img_full_path = os.path.normpath(os.path.join(base_dir, img_rel_path))
