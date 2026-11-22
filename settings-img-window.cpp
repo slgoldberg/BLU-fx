@@ -342,15 +342,15 @@ static bool sHasSavedPosition = false;
 static WindowGeometry CalcDefaultSettingsGeometry()
 {
     int screenL = 0, screenT = 0, screenR = 0, screenB = 0;
-    XPLMGetScreenBoundsGlobal(&screenL, &screenT, &screenR, &screenB);
+    ImgWindow::GetMainMonitorBoundsGlobal(&screenL, &screenT, &screenR, &screenB);
 
     int w = SettingsImgWindow::DEFAULT_WIDTH;
     int h = SettingsImgWindow::DEFAULT_HEIGHT;
     if (LEGACY_FEATURES) {
-        h += 180; // Add room if XP11 Raleigh Scale, FPS-Limiter & Cinema Verite sections are shown
+        h += 200; // Add room if XP11 Raleigh Scale, FPS-Limiter & Cinema Verite sections are shown
     }
 
-    if (sHasSavedPosition || (sWindowLeft >= 0 && sWindowTop >= 0)) {
+    if (sHasSavedPosition || (sWindowTop > 0 && sWindowLeft != -1)) {
         int left = sHasSavedPosition ? sLastInSimLeft : sWindowLeft;
         int top  = sHasSavedPosition ? sLastInSimTop  : sWindowTop;
         return WindowGeometry::Sanitize(
@@ -360,15 +360,17 @@ static WindowGeometry CalcDefaultSettingsGeometry()
             top - h,
             w, h,
             40,
-            WindowSanitizeMode::KeepVisibleMargin
+            WindowSanitizeMode::KeepVisibleMargin,
+            xplm_WindowDecorationSelfDecorated
         );
     }
 
-    return WindowGeometry::FromTopLeft(
-        screenL + SettingsImgWindow::DEFAULT_LEFT_OFFSET,
-        screenT - SettingsImgWindow::DEFAULT_TOP_OFFSET,
+    return WindowGeometry::FromMainMonitorTopLeft(
+        SettingsImgWindow::DEFAULT_LEFT_OFFSET,
+        SettingsImgWindow::DEFAULT_TOP_OFFSET,
         w,
-        h
+        h,
+        xplm_WindowDecorationSelfDecorated
     );
 }
 
@@ -383,7 +385,7 @@ SettingsImgWindow::SettingsImgWindow()
     int minW = SettingsImgWindow::DEFAULT_WIDTH;
     int minH = 480;
     if (LEGACY_FEATURES) {
-        minH += 180;
+        minH += 200;
     }
     SetWindowResizingLimits(minW, minH, 760, 1200);
 
@@ -440,9 +442,12 @@ void SettingsImgWindow::ResetToDefaultGeometry()
     }
 }
 
+static void SyncUIStateWithActiveProfile();
+
 bool SettingsImgWindow::onShow()
 {
     mShowCloseConfirmModal = false;
+    SyncUIStateWithActiveProfile();
     // Always open at the default top-left position and size (no saved window position for now):
     ResetToDefaultGeometry();
     return true;
@@ -1712,7 +1717,8 @@ void SettingsImgWindow::buildInterface()
     int left, top, right, bottom;
     GetWindowGeometry(left, top, right, bottom);
     int currentH = top - bottom;
-    int targetH = (int)(ImGui::GetCursorPosY() + 2.0f);
+    int extraBottomPad = LEGACY_FEATURES ? (int)(ImGui::GetTextLineHeightWithSpacing() + 4.0f) : 2;
+    int targetH = (int)(ImGui::GetCursorPosY()) + extraBottomPad;
 
     // Defensive bounds guard: height must be realistic (min 350px, max 1200px)
     constexpr int minValidH = 350;

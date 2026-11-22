@@ -543,6 +543,12 @@ void ApplyPreset(int presetIdx)
     greenOffset = BLUfxPresets[presetIdx].greenOffset;
     blueOffset  = BLUfxPresets[presetIdx].blueOffset;
     vignette    = BLUfxPresets[presetIdx].vignette;
+    if (presetIdx == PRESET_DEFAULT || presetIdx == PRESET_USER) {
+        raleighScale = BLUfxPresets[presetIdx].raleighScale;
+        if (postProcesssingEnabled || sMomentaryFullView) {
+            UpdateRaleighScale(0);
+        }
+    }
 #ifdef INCLUDE_SETTINGS_IN_PRESETS /* not really loaded, except for reload .ini */
     raleighScale = BLUfxPresets[presetIdx].raleighScale;
     maxFps       = BLUfxPresets[presetIdx].maxFps;
@@ -1280,25 +1286,43 @@ void MigrateLegacyConfigIfNeeded(void)
     bool hasLegacyIni = (stat(CONFIG_PATH, &st) == 0);
 
     if (!hasPrefs) {
-        // First run of v2.0!
+        // First run of v2.0 (detected by absence of Output/preferences/blu_fx.prf)!
+        std::string destProfile = std::string(PROFILES_PATH) + "/blu_fx.ini";
         if (hasLegacyIni) {
-            // Read legacy values first to capture maxFps, cinemaVerite, and color values:
-            LoadSettingsFromFile(CONFIG_PATH);
-
-            // Move legacy file into profiles/:
-            std::string destProfile = std::string(PROFILES_PATH) + "/blu_fx.ini";
+            // If profiles/blu_fx.ini already exists on disk, check whether its color settings differ
+            // from the root blu_fx.ini before backing it up to blu_fx_backup.ini:
             if (stat(destProfile.c_str(), &st) == 0) {
-                // Collision guard: if blu_fx.ini already exists in profiles, backup:
-                destProfile = std::string(PROFILES_PATH) + "/blu_fx_backup.ini";
-                sActiveProfileName = "blu_fx_backup.ini";
+                LoadSettingsFromFile(destProfile);
+                BLUfxPreset existingProf = {
+                    brightness, contrast, saturation,
+                    redScale, greenScale, blueScale,
+                    redOffset, greenOffset, blueOffset,
+                    vignette, raleighScale, maxFps, disableCinemaVeriteTime
+                };
+                LoadSettingsFromFile(CONFIG_PATH);
+                if (!isActivePreset(&existingProf)) {
+                    std::string backupProfile = std::string(PROFILES_PATH) + "/blu_fx_backup.ini";
+                    rename(destProfile.c_str(), backupProfile.c_str());
+                }
             } else {
-                sActiveProfileName = "blu_fx.ini";
+                // Read legacy values first to capture maxFps, cinemaVerite, and color values:
+                LoadSettingsFromFile(CONFIG_PATH);
             }
 
-            // Copy settings into profiles/ while preserving legacy blu_fx.ini for downgrade safety:
+            sActiveProfileName = "blu_fx.ini";
+            sStartupActiveProfile = "blu_fx.ini";
+
+            // Copy settings into profiles/blu_fx.ini while preserving root blu_fx.ini for downgrade safety:
             SaveSettingsToFile(destProfile);
             SavePreferences();
-            XPLMDebugString("Blu-FX: Migrated settings to profiles/ (preserved root blu_fx.ini) and created Output/preferences/blu_fx.prf\n");
+            XPLMDebugString("Blu-FX: Migrated settings to profiles/blu_fx.ini (preserved root blu_fx.ini) and created Output/preferences/blu_fx.prf\n");
+        } else if (stat(destProfile.c_str(), &st) == 0) {
+            // No root blu_fx.ini, but profiles/blu_fx.ini exists: adopt it as startup profile
+            LoadSettingsFromFile(destProfile);
+            sActiveProfileName = "blu_fx.ini";
+            sStartupActiveProfile = "blu_fx.ini";
+            SavePreferences();
+            XPLMDebugString("Blu-FX: Adopted existing profiles/blu_fx.ini and created Output/preferences/blu_fx.prf\n");
         } else {
             // Fresh install with no legacy file: start clean with identity defaults and (None) profile
             sActiveProfileName.clear();

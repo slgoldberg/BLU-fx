@@ -91,17 +91,18 @@ static const char* s_FallbackMarkdown =
 static WindowGeometry CalcDefaultDocViewerGeometry()
 {
     int screenL = 0, screenT = 0, screenR = 0, screenB = 0;
-    XPLMGetScreenBoundsGlobal(&screenL, &screenT, &screenR, &screenB);
+    ImgWindow::GetMainMonitorBoundsGlobal(&screenL, &screenT, &screenR, &screenB);
 
     int w = (sDocViewerWidth >= 480) ? sDocViewerWidth : DocViewerImgWindow::DEFAULT_WIDTH;
     int h = (sDocViewerHeight >= 300) ? sDocViewerHeight : DocViewerImgWindow::DEFAULT_HEIGHT;
 
-    if (sDocViewerLeft >= 0 && sDocViewerTop >= 0) {
+    if (sDocViewerTop > 0 && sDocViewerLeft != -1) {
         return WindowGeometry::Sanitize(
             sDocViewerLeft, sDocViewerTop,
             sDocViewerLeft + w, sDocViewerTop - h,
             w, h, 40,
-            WindowSanitizeMode::KeepVisibleMargin
+            WindowSanitizeMode::KeepVisibleMargin,
+            xplm_WindowDecorationSelfDecoratedResizable
         );
     }
 
@@ -115,7 +116,8 @@ static WindowGeometry CalcDefaultDocViewerGeometry()
     return WindowGeometry::Sanitize(
         left, top, left + w, top - h,
         w, h, 40,
-        WindowSanitizeMode::KeepVisibleMargin
+        WindowSanitizeMode::KeepVisibleMargin,
+        xplm_WindowDecorationSelfDecoratedResizable
     );
 }
 
