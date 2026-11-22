@@ -1261,13 +1261,13 @@ bool LoadPreferences(void)
         } else if (strcmp(key, "maxFps") == 0) {
             int fps = atoi(val);
             if (fps > 0) {
-                fpsLimiterEnabled = 1;
                 maxFps = (float)fps;
+                SetFpsLimiterEnabled(true);
             } else {
-                fpsLimiterEnabled = 0;
+                SetFpsLimiterEnabled(false);
             }
         } else if (strcmp(key, "cinemaVeriteEnabled") == 0) {
-            controlCinemaVeriteEnabled = atoi(val);
+            SetControlCinemaVeriteEnabled(atoi(val) != 0);
         } else if (strcmp(key, "cinemaVeriteDisableTime") == 0) {
             disableCinemaVeriteTime = (float)atof(val);
         }
@@ -1436,9 +1436,10 @@ bool LoadSettingsFromFile(const std::string& path)
         else if (strcmp(key, "raleighScale") == 0) raleighScale = (float)atof(val);
         else if (strcmp(key, "postProcesssingEnabled") == 0 || strcmp(key, "postProcessingEnabled") == 0) postProcesssingEnabled = atoi(val);
         else if (strcmp(key, "fpsLimiterEnabled") == 0) fpsLimiterEnabled = atoi(val);
-        else if (strcmp(key, "controlCinemaVeriteEnabled") == 0 || strcmp(key, "cinemaVeriteEnabled") == 0) controlCinemaVeriteEnabled = atoi(val);
         else if (strcmp(key, "maxFps") == 0) maxFps = (float)atof(val);
-        else if (strcmp(key, "disableCinemaVeriteTime") == 0 || strcmp(key, "cinemaVeriteDisableTime") == 0) disableCinemaVeriteTime = (float)atof(val);
+        // Note: Cinema Verite settings (controlCinemaVeriteEnabled / disableCinemaVeriteTime)
+        // in legacy .ini files are intentionally ignored in v2.0 so Cinema Verite always starts
+        // OFF by default and is controlled exclusively via Output/preferences/blu_fx.prf.
     }
 
     fclose(fp);

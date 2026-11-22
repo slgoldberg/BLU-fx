@@ -1681,11 +1681,17 @@ void SettingsImgWindow::buildInterface()
         bool fpsEnabled = (fpsLimiterEnabled != 0);
         if (ImGui::ToggleButton("Enable FPS-Limiter", &fpsEnabled)) {
             SetFpsLimiterEnabled(fpsEnabled);
+            SavePreferences();
         }
         ImGui::TimedTooltip::TextMD("Limits X-Plane's maximum frame rate to smooth out frame-time spikes.");
 
         ImGui::PushItemWidth(legacySliderWidth);
-        ImGui::SliderWithReset("Max FPS", &maxFps, DEFAULT_MAX_FRAME_RATE, 20.0f, 200.0f, "%.0f fps", 0, 1.0f);
+        if (ImGui::SliderWithReset("Max FPS", &maxFps, DEFAULT_MAX_FRAME_RATE, 20.0f, 200.0f, "%.0f fps", 0, 1.0f)) {
+            SavePreferences();
+        }
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            SavePreferences();
+        }
         ImGui::TimedTooltip::TextMD("Target maximum frame rate when FPS-Limiter is enabled (`20` to `200` FPS).");
         ImGui::PopItemWidth();
 
@@ -1697,11 +1703,17 @@ void SettingsImgWindow::buildInterface()
         bool cvEnabled = (controlCinemaVeriteEnabled != 0);
         if (ImGui::ToggleButton("Control Cinema Verite", &cvEnabled)) {
             SetControlCinemaVeriteEnabled(cvEnabled);
+            SavePreferences();
         }
         ImGui::TimedTooltip::TextMD("Automatically pauses Cinema Verite camera shake in the 3D cockpit while you move the mouse.");
 
         ImGui::PushItemWidth(legacySliderWidth);
-        ImGui::SliderWithReset("On input disable for", &disableCinemaVeriteTime, DEFAULT_DISABLE_CINEMA_VERITE_TIME, 1.0f, 30.0f, "%.0f sec", 0, 1.0f);
+        if (ImGui::SliderWithReset("On input disable for", &disableCinemaVeriteTime, DEFAULT_DISABLE_CINEMA_VERITE_TIME, 1.0f, 30.0f, "%.0f sec", 0, 1.0f)) {
+            SavePreferences();
+        }
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            SavePreferences();
+        }
         ImGui::TimedTooltip::TextMD("Duration (in seconds) to keep Cinema Verite paused after mouse interaction stops (`1` to `30` sec).");
         ImGui::PopItemWidth();
 
