@@ -6,6 +6,12 @@
 #     (NOTE: not supported; this comment was copied ... :-) )
 
 cmake_minimum_required(VERSION 3.9)
+
+# Must be set BEFORE project() so CMake initializes the macOS toolchain for Universal Binary
+# (x86_64 + arm64) and deployment target on the very first configure pass (ignored on non-macOS).
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING "Minimum macOS version" FORCE)
+set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures for macOS" FORCE)
+
 project(blu_fx VERSION 2.0.0 DESCRIPTION "Blu-FX X-Plane plugin")
 
 # By default, use optimized release configuration.
@@ -152,10 +158,7 @@ add_library(blu_fx SHARED ${BLUFX_SRCS})
 target_compile_features(blu_fx PUBLIC cxx_std_17)
 
 if (APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING
-        "Minimum macOS version" FORCE)
-    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64"
-        CACHE STRING "Build architectures for mac OS X" FORCE)
+    set_target_properties(blu_fx PROPERTIES OSX_ARCHITECTURES "x86_64;arm64")
     # X-Plane supports OS X 10.10+, so this should ensure blu_fx can run on
     # all supported versions.
     target_compile_options(blu_fx PUBLIC

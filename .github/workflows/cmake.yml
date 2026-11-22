@@ -109,6 +109,12 @@ jobs:
         run: |
           ls -la "${{ github.workspace }}/build/mac_x64/blu_fx.xpl"
           lipo -info "${{ github.workspace }}/build/mac_x64/blu_fx.xpl"
+          ARCHS=$(lipo -archs "${{ github.workspace }}/build/mac_x64/blu_fx.xpl")
+          echo "Detected architectures: $ARCHS"
+          if [[ "$ARCHS" != *"x86_64"* ]] || [[ "$ARCHS" != *"arm64"* ]]; then
+            echo "::error::macOS blu_fx.xpl is not a universal binary (expected x86_64 and arm64, got: $ARCHS)"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
