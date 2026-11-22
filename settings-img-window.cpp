@@ -347,7 +347,7 @@ static WindowGeometry CalcDefaultSettingsGeometry()
     int w = SettingsImgWindow::DEFAULT_WIDTH;
     int h = SettingsImgWindow::DEFAULT_HEIGHT;
     if (LEGACY_FEATURES) {
-        h += 200; // Add room if XP11 Raleigh Scale, FPS-Limiter & Cinema Verite sections are shown
+        h += 180; // Add room if XP11 Raleigh Scale, FPS-Limiter & Cinema Verite sections are shown
     }
 
     if (sHasSavedPosition || (sWindowTop > 0 && sWindowLeft != -1)) {
@@ -385,7 +385,7 @@ SettingsImgWindow::SettingsImgWindow()
     int minW = SettingsImgWindow::DEFAULT_WIDTH;
     int minH = 480;
     if (LEGACY_FEATURES) {
-        minH += 200;
+        minH += 180;
     }
     SetWindowResizingLimits(minW, minH, 760, 1200);
 
@@ -1701,14 +1701,14 @@ void SettingsImgWindow::buildInterface()
         if (IM_BOLD_FONT) ImGui::PopFont();
 
         bool cvEnabled = (controlCinemaVeriteEnabled != 0);
-        if (ImGui::ToggleButton("Control Cinema Verite", &cvEnabled)) {
+        if (ImGui::ToggleButton("Auto-disable Cinema Verite on cockpit mouse movement for:", &cvEnabled)) {
             SetControlCinemaVeriteEnabled(cvEnabled);
             SavePreferences();
         }
         ImGui::TimedTooltip::TextMD("Automatically pauses Cinema Verite camera shake in the 3D cockpit while you move the mouse.");
 
         ImGui::PushItemWidth(legacySliderWidth);
-        if (ImGui::SliderWithReset("On input disable for", &disableCinemaVeriteTime, DEFAULT_DISABLE_CINEMA_VERITE_TIME, 1.0f, 30.0f, "%.0f sec", 0, 1.0f)) {
+        if (ImGui::SliderWithReset("Max auto-disable time", &disableCinemaVeriteTime, DEFAULT_DISABLE_CINEMA_VERITE_TIME, 1.0f, 30.0f, "%.0f sec", 0, 1.0f)) {
             SavePreferences();
         }
         if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -1729,8 +1729,7 @@ void SettingsImgWindow::buildInterface()
     int left, top, right, bottom;
     GetWindowGeometry(left, top, right, bottom);
     int currentH = top - bottom;
-    int extraBottomPad = LEGACY_FEATURES ? (int)(ImGui::GetTextLineHeightWithSpacing() + 4.0f) : 2;
-    int targetH = (int)(ImGui::GetCursorPosY()) + extraBottomPad;
+    int targetH = (int)(ImGui::GetCursorPosY() + 2.0f);
 
     // Defensive bounds guard: height must be realistic (min 350px, max 1200px)
     constexpr int minValidH = 350;
