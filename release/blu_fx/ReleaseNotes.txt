@@ -1,16 +1,20 @@
-BLU-fx v2.0.0b3  (packaged on Sat Nov 21 2026)
+BLU-fx v2.0.0b3  (packaged on Sun Nov 22 2026)
 ===============================================================================
 
 HIGHLIGHTS FOR THIS RELEASE (v2.0.0b3):
 
-  * Universal macOS Binary & Multi-Monitor Fixes:
+  * Universal macOS Binary, Multi-Monitor & OpenGL Fixes:
+    - Upgraded to ImgWindow v2.5.0 and latest ImGee UI extensions.
     - Fixed CMake first-pass macOS Universal Binary configuration (x86_64 + arm64)
       for full Intel and Apple Silicon compatibility across X-Plane 11 and 12.
     - Fixed default placement for Settings and User Guide windows on multi-monitor
       setups to target X-Plane's Main Monitor instead of the far-left monitor.
     - Fixed first-run v1.x blu_fx.ini profile migration to automatically set the
       migrated profile as the active and startup profile in Output/preferences/blu_fx.prf.
-    - Added extra bottom content height margin in X-Plane 11 mode.
+    - X-Plane 11: Cinema Verite auto-disable settings now default to OFF, ignore
+      legacy .ini keys, and save exclusively in Output/preferences/blu_fx.prf.
+    - Fixed OpenGL draw index offset handling for callout cards and reordered UI layers,
+      plus crisp clockwise anti-aliased Reset/Restore arrowheads.
 
   * In-Simulator User Guide Window (ImGee v1.1.0 & ImgDocWindow):
     - Added a dedicated "User Guide Window" button directly in the Settings window
