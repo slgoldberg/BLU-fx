@@ -24,12 +24,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RELEASE_SRC="$REPO_ROOT/release/blu_fx"
 
+if [[ -z "${BLUFX_VERSION:-}" ]]; then
+    BLUFX_VERSION=$(grep '#define VERSION' "$REPO_ROOT/blu_fx.h" | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+fi
+
 stage_channel() {
     local CHANNEL="$1"
-    local CHANNEL_CFG="$REPO_ROOT/deploy/channels/${CHANNEL}_config.txt"
-    if [[ ! -f "$CHANNEL_CFG" ]]; then
-        echo "Error: Unknown channel configuration: $CHANNEL_CFG"
-        echo "Available channels: release, beta, daily, all"
+    local BASE_CFG="$RELEASE_SRC/skunkcrafts_updater_config.txt"
+    if [[ ! -f "$BASE_CFG" ]]; then
+        echo "Error: Missing single-source channel configuration: $BASE_CFG"
         exit 1
     fi
 
@@ -40,10 +43,7 @@ stage_channel() {
 
     # 1. Copy documentation and metadata
     echo "    Copying documentation & version metadata..."
-    local RESOLVED_VER=$(grep '^version|' "$CHANNEL_CFG" | head -n1 | cut -d'|' -f2 | tr -d '\r')
-    if [[ "$CHANNEL" != "release" ]]; then
-        RESOLVED_VER="$BLUFX_VERSION"
-    fi
+    local RESOLVED_VER="${BLUFX_VERSION:-$(grep '^version|' "$BASE_CFG" | head -n1 | cut -d'|' -f2 | tr -d '\r')}"
 
     # Generate stamped README.txt with version, timestamp, and attribution
     {
@@ -102,10 +102,7 @@ stage_channel() {
 
     # 3. Control files & channel configuration
     echo "    Copying control lists and channel configuration..."
-    cp -a "$CHANNEL_CFG" "$STAGING_DIR/skunkcrafts_updater_config.txt"
-    if [[ "$CHANNEL" != "release" ]]; then
-        sed -E "s/^version\|.*/version|${BLUFX_VERSION}/" "$CHANNEL_CFG" > "$STAGING_DIR/skunkcrafts_updater_config.txt"
-    fi
+    sed -E "s/^version\|.*/version|${RESOLVED_VER}/" "$BASE_CFG" > "$STAGING_DIR/skunkcrafts_updater_config.txt"
     cp -a "$RELEASE_SRC/skunkcrafts_updater_blacklist.txt" "$STAGING_DIR/"
     cp -a "$RELEASE_SRC/skunkcrafts_updater_ignorelist.txt" "$STAGING_DIR/"
     cp -a "$RELEASE_SRC/skunkcrafts_updater_oncelist.txt" "$STAGING_DIR/"
