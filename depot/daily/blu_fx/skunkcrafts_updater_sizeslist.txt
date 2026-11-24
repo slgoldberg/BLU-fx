@@ -4,7 +4,6 @@ Version.txt|60
 docs/BLUFX_User_Guide.md|15855
 docs/BLUFX_User_Guide.pdf|3206603
 docs/images/blufx_hero_banner.jpg|902888
-docs/images/blufx_hero_banner_opt.jpg|183044
 docs/images/split_preview_demo.png|820429
 docs/images/ui_overview.png|565443
 lin_x64/blu_fx.xpl|3173592

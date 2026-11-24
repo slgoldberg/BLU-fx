@@ -1,6 +1,6 @@
 BLU-fx -- Real-Time Color Grading for X-Plane 12 & 11
 Copyright (C) 2026 by Steven L. Goldberg (@slgoldberg)
-v2.0.0b3 (packaged on Mon Nov 23 04:10:38 UTC 2026)
+v2.0.0b3 (packaged on Tue Nov 24 21:38:46 UTC 2026)
 See ReleaseNotes.txt for full change history.
 ===============================================================================
 
