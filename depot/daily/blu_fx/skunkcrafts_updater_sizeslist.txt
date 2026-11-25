@@ -1,6 +1,6 @@
-README.txt|3542
-ReleaseNotes.txt|7854
-Version.txt|60
+README.txt|3540
+ReleaseNotes.txt|5373
+Version.txt|58
 docs/BLUFX_User_Guide.md|15855
 docs/BLUFX_User_Guide.pdf|3206603
 docs/images/blufx_hero_banner.jpg|902888
