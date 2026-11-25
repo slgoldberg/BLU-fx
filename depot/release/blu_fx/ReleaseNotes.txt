@@ -1,0 +1,112 @@
+BLU-fx v2.0.0  (packaged on Wed Nov 25 2026)
+===============================================================================
+
+HIGHLIGHTS FOR THIS RELEASE (v2.0.0):
+
+  * Modern Dear ImGui User Interface (ImgWindow v2.5.0 & ImGee):
+    - Replaced legacy XPWidgets with a dark-themed Dear ImGui interface
+      supporting X-Plane UI Zoom, Retina, and high-DPI displays across
+      macOS, Windows, and Linux.
+    - Multi-monitor aware: Settings and User Guide windows open on X-Plane's
+      Main Monitor by default.
+    - Clean per-control Reset/Restore undo support, active cursor affordances,
+      and delayed hover tooltips that stay out of your way while adjusting sliders.
+
+  * Live Interactive Split-Screen Preview:
+    - Compare color grading adjustments side-by-side against raw simulator
+      output in real time before saving.
+    - Draggable split-screen divider with optional hairline indicator and a
+      momentary full-view hold button for quick A/B checks.
+
+  * Named Profiles & Automatic v1.x Migration:
+    - Save, switch, rename, and organize color grading profiles in
+      Resources/plugins/blu_fx/profiles/.
+    - Upgrading from v1.x automatically migrates your existing blu_fx.ini
+      into profiles/ and selects it as your active and startup profile.
+    - Downgrade safety: saving adjustments or profiles automatically mirrors
+      your current settings back to the root blu_fx.ini file so downgrading
+      to v1.x keeps your latest look intact (can be turned off via the
+      Settings footer checkbox).
+
+  * Clean Preferences Separation:
+    - UI and plugin state (window positions, active/startup profile, split
+      preview divider, and X-Plane 11 Cinema Verite options) are saved to
+      Output/preferences/blu_fx.prf, keeping profile .ini files purely about
+      color grading.
+
+  * Built-In Illustrated User Guide Window:
+    - Open the full User Guide right inside X-Plane from Plugins > BLU-fx >
+      User Guide or the "User Guide Window" button in the Settings footer.
+    - Includes a zoom slider, table-of-contents navigation, transparency
+      controls, styled note/tip/warning callout cards, and click-to-enlarge
+      illustrations.
+    - A bundled PDF manual is also included in docs/BLUFX_User_Guide.pdf.
+
+  * Dual-Simulator & Triple-Platform Native 64-Bit Builds:
+    - Full support for X-Plane 12 and X-Plane 11 (OpenGL, Vulkan, and Metal).
+    - Automatically detects X-Plane 12 and hides legacy X-Plane 11 Rayleigh
+      scattering and Cinema Verite controls.
+    - X-Plane 11: Cinema Verite auto-disable settings default to OFF and are
+      stored exclusively in Output/preferences/blu_fx.prf.
+    - Native 64-bit binaries for macOS Universal (Apple Silicon arm64 +
+      Intel x86_64), Windows x64, and Linux x64.
+
+  * SkunkCrafts Updater v4 Multi-Channel Support:
+    - Hosted on GitHub Pages CDN with four channels: Release, Beta, Daily,
+      and Classic.
+    - Need to revert to the original XPWidgets plugin at any time? Switch
+      to the Classic channel in SkunkCrafts Updater to roll back cleanly
+      to legacy v1.2.3.
+
+===============================================================================
+HISTORICAL RELEASE NOTES:
+===============================================================================
+
+v1.2.3: (January, 2026)
+
+  * Fix minor issues that might cause complaints in X-Plane v12.4.0, due
+    to checks that X-Plane now does to ensure that plugins don't access
+    XPLM features before their XPluginStart() function is called.
+  * Move legacy startup checks to runtime to ensure strict XPLM compliance.
+  * Intentionally ignore any attempts to modify the X-Plane 11 only feature
+    "Cinema Verite" setting in newer XP12 versions.
+
+v1.2.2:
+
+  * Change the order of startup and shutdown of all OpenGL functionality
+    based on the requirements for plugin uses in environments with modern
+    graphics drivers (X-Plane v11.50+ in Vulkan/Metal mode, and X-Plane 12+).
+  * Eliminate potential timing issues with early initialization and late
+    teardown of OpenGL library calls.
+  * Support dynamic disabling and re-enabling of BLU-fx from within the
+    X-Plane Plugin Admin menu without restarting the simulator.
+
+v1.2.1:
+
+  * When the current configuration matches one of the presets displayed
+    in the button array in the Settings window, disable that preset button
+    so the user can easily tell which preset is currently loaded.
+  * Help users recognize when a restored preset matches saved configuration.
+
+v1.2.0:
+
+  * Introduce support for X-Plane 11 and X-Plane 12 (64-bit only).
+  * Provide quick restoration of the current filter configuration from the
+    saved .prf / .ini file.
+  * Support swapping the active .ini file and reloading on demand without
+    restarting X-Plane.
+  * Hide the Rayleigh slider in X-Plane 12, since Rayleigh scattering is
+    handled natively by the new physical photometric atmosphere engine.
+  * Fix window and font sizing for non-100% UI Zoom settings in X-Plane.
+  * Add buttons to reload and save filter state on demand.
+
+v1.1.0:
+
+  * 64-bit release supporting modern X-Plane plugin formats (X-Plane 11.10+).
+  * Drop support for legacy 32-bit operating systems and X-Plane 10.
+  * Add Revert button to discard unsaved filter adjustments.
+
+v1.0.0:
+
+  * Original open-source post-processing color grading plugin created by
+    Matteo Hausner.
