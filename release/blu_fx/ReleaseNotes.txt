@@ -1,103 +1,62 @@
-BLU-fx v2.0.0b3  (packaged on Sun Nov 22 2026)
+BLU-fx v2.0.0  (packaged on Wed Nov 25 2026)
 ===============================================================================
 
-HIGHLIGHTS FOR THIS RELEASE (v2.0.0b3):
+HIGHLIGHTS FOR THIS RELEASE (v2.0.0):
 
-  * Universal macOS Binary, Multi-Monitor & OpenGL Fixes:
-    - Upgraded to ImgWindow v2.5.0 and latest ImGee UI extensions.
-    - Fixed CMake first-pass macOS Universal Binary configuration (x86_64 + arm64)
-      for full Intel and Apple Silicon compatibility across X-Plane 11 and 12.
-    - Fixed default placement for Settings and User Guide windows on multi-monitor
-      setups to target X-Plane's Main Monitor instead of the far-left monitor.
-    - Fixed first-run v1.x blu_fx.ini profile migration to automatically set the
-      migrated profile as the active and startup profile in Output/preferences/blu_fx.prf.
-    - X-Plane 11: Cinema Verite auto-disable settings now default to OFF, ignore
-      legacy .ini keys, and save exclusively in Output/preferences/blu_fx.prf.
-    - Fixed OpenGL draw index offset handling for callout cards and reordered UI layers,
-      plus crisp clockwise anti-aliased Reset/Restore arrowheads.
-
-  * In-Simulator User Guide Window (ImGee v1.1.0 & ImgDocWindow):
-    - Added a dedicated "User Guide Window" button directly in the Settings window
-      footer (bottom right), making the complete illustrated manual instantly
-      accessible right inside X-Plane without leaving the simulator or opening a PDF.
-    - Features full 2-row document viewer chrome: zoom slider, table-of-contents
-      navigation, transparency controls, and live hot-reloading.
-
-  * Native ImGee GFM Alert Callout Cards:
-    - User Guide now features native GitHub Flavored Markdown alert cards
-      (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]).
-    - Each callout renders with dedicated theme-aware accents, backgrounds,
-      and vector iconography powered by ImGee's procedural rendering engine.
-
-  * Click-to-Enlarge Markdown Image Lightbox:
-    - Clicking any User Guide illustration opens an in-context, aspect-fit
-      zoom lightbox clamped directly to the window canvas.
-    - Deepened dimmer overlay and dedicated high-contrast backing plates behind
-      figure captions for crystal-clear readability over document text.
-    - Robust release-dismissal hit-shielding: clicking anywhere outside the image
-      or pressing Esc dismisses the lightbox cleanly without click-through loops.
-
-  * Zero-Bias Procedural Vector Icons:
-    - Completely eliminated Dear ImGui half-pixel line bias across all vector glyphs,
-      ensuring perfectly symmetric, upright exclamation marks, dots, and a newly
-      refined lightbulb silhouette.
-
-  * UI & Tooltip Polish:
-    - Full TimedTooltip click-to-toggle support across status indicators.
-    - Active cursor affordances (Hand for links/triggers, ResizeNS for menus).
-
-===============================================================================
-BLU-fx v2.0.0b1  (packaged on Mon Nov 16 2026)
-===============================================================================
-
-HIGHLIGHTS FOR THIS RELEASE (v2.0.0b1):
-
-  * Modern ImGui User Interface:
-    - Completely replaced legacy XPWidgets with a modern, dark-themed Dear ImGui
-      interface powered by ImgWindow.
-    - Crisp, proportional font rendering with full support for X-Plane UI Zoom,
-      Retina, and high-DPI displays across macOS, Windows, and Linux.
-    - Balanced, symmetric 7-boxel window bezels matching native simulator chrome.
+  * Modern Dear ImGui User Interface (ImgWindow v2.5.0 & ImGee):
+    - Replaced legacy XPWidgets with a dark-themed Dear ImGui interface
+      supporting X-Plane UI Zoom, Retina, and high-DPI displays across
+      macOS, Windows, and Linux.
+    - Multi-monitor aware: Settings and User Guide windows open on X-Plane's
+      Main Monitor by default.
+    - Clean per-control Reset/Restore undo support, active cursor affordances,
+      and delayed hover tooltips that stay out of your way while adjusting sliders.
 
   * Live Interactive Split-Screen Preview:
-    - Instantly evaluate color grading adjustments side-by-side with raw simulator
-      output before saving.
-    - Draggable interactive curtain wipe divider with an optional high-contrast
-      hairline indicator.
-    - Momentary full-view hold button for rapid A/B visual comparisons.
+    - Compare color grading adjustments side-by-side against raw simulator
+      output in real time before saving.
+    - Draggable split-screen divider with optional hairline indicator and a
+      momentary full-view hold button for quick A/B checks.
 
-  * Non-Destructive Preference Architecture:
-    - User interface preferences (window positions, split preview state, curtain
-      divider position) are now saved independently to Output/preferences/blu_fx.prf.
-    - Your color grading settings remain pure in their respective profile .ini files
-      without UI pollution.
+  * Named Profiles & Automatic v1.x Migration:
+    - Save, switch, rename, and organize color grading profiles in
+      Resources/plugins/blu_fx/profiles/.
+    - Upgrading from v1.x automatically migrates your existing blu_fx.ini
+      into profiles/ and selects it as your active and startup profile.
+    - Downgrade safety: saving adjustments or profiles automatically mirrors
+      your current settings back to the root blu_fx.ini file so downgrading
+      to v1.x keeps your latest look intact (can be turned off via the
+      Settings footer checkbox).
 
-  * Integrated In-Simulator User Guide:
-    - Comprehensive user documentation accessible directly from the simulator menu
-      (Plugins > BLU-fx > User Guide) and Settings window header.
-    - Rich in-window markdown reader featuring high-resolution illustrated figures,
-      smooth font zooming, and hot-reload support.
-    - High-quality bundled PDF manual located in docs/BLUFX_User_Guide.pdf.
+  * Clean Preferences Separation:
+    - UI and plugin state (window positions, active/startup profile, split
+      preview divider, and X-Plane 11 Cinema Verite options) are saved to
+      Output/preferences/blu_fx.prf, keeping profile .ini files purely about
+      color grading.
 
-  * Dual-Simulator & Multiplatform Support:
-    - Full native compatibility with X-Plane 12 (photometric atmospheric lighting)
-      and X-Plane 11 (OpenGL, Vulkan, and Metal).
-    - Automatically detects X-Plane 12 and cleanly hides legacy Rayleigh scattering
-      and camera shaking overrides.
-    - Triple-platform native 64-bit binaries: macOS universal (Apple Silicon arm64
-      and Intel x86_64), Windows x64, and Linux x64.
+  * Built-In Illustrated User Guide Window:
+    - Open the full User Guide right inside X-Plane from Plugins > BLU-fx >
+      User Guide or the "User Guide Window" button in the Settings footer.
+    - Includes a zoom slider, table-of-contents navigation, transparency
+      controls, styled note/tip/warning callout cards, and click-to-enlarge
+      illustrations.
+    - A bundled PDF manual is also included in docs/BLUFX_User_Guide.pdf.
 
-  * Modern SkunkCrafts Updater v4 Integration:
-    - Distributed across high-speed global CDN (GitHub Pages) with multi-channel
-      support (release, beta, and daily).
+  * Dual-Simulator & Triple-Platform Native 64-Bit Builds:
+    - Full support for X-Plane 12 and X-Plane 11 (OpenGL, Vulkan, and Metal).
+    - Automatically detects X-Plane 12 and hides legacy X-Plane 11 Rayleigh
+      scattering and Cinema Verite controls.
+    - X-Plane 11: Cinema Verite auto-disable settings default to OFF and are
+      stored exclusively in Output/preferences/blu_fx.prf.
+    - Native 64-bit binaries for macOS Universal (Apple Silicon arm64 +
+      Intel x86_64), Windows x64, and Linux x64.
 
-  * Downgrade Safety & Legacy Mirroring:
-    - Automatically updates a mirror of current color adjustments into the root
-      blu_fx.ini file whenever adjustments or profiles are saved.
-    - If you ever downgrade or switch back to v1.x, your latest color grading
-      settings remain fully intact and immediately accessible.
-    - Optional opt-out checkbox in Settings footer if you want to turn off
-      legacy file updates completely.
+  * SkunkCrafts Updater v4 Multi-Channel Support:
+    - Hosted on GitHub Pages CDN with four channels: Release, Beta, Daily,
+      and Classic.
+    - Need to revert to the original XPWidgets plugin at any time? Switch
+      to the Classic channel in SkunkCrafts Updater to roll back cleanly
+      to legacy v1.2.3.
 
 ===============================================================================
 HISTORICAL RELEASE NOTES:

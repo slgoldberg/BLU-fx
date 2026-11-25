@@ -6,3 +6,5 @@ docs/.DS_Store
 docs/history/.DS_Store
 index.html
 blu_fx.ini
+profiles
+profiles/*

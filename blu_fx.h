@@ -28,7 +28,7 @@
 #define NAME_BLANK "      "           /* to align multi-line log entries :-) */
 #define NAME_LOWERCASE "blu_fx"
 
-#define VERSION "2.0.0b3"
+#define VERSION "2.0.0"
 #define VERSION_BLANK "     "         /* to align multi-line log entries :-) */
 
 // Define qualified name that includes version (e.g., "BLU-fx v1.3.0")
