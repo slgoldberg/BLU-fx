@@ -61,6 +61,7 @@ jobs:
   build:
     needs: [preflight]
     uses: ./.github/workflows/cmake.yml
+    secrets: inherit
 
   publish:
     needs: [build]

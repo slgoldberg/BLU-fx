@@ -116,6 +116,90 @@ jobs:
             exit 1
           fi
 
+      - name: Sign & Notarize macOS Universal Binary (Apple Developer ID)
+        if: github.event_name == 'workflow_call'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          PLUGIN="${{ github.workspace }}/build/mac_x64/blu_fx.xpl"
+
+          for var in MACOS_CERT_P12_BASE64 MACOS_CERT_PASSWORD APPLE_ID APPLE_TEAM_ID APPLE_APP_PASSWORD; do
+            if [[ -z "${!var:-}" ]]; then
+              echo "::error::Missing required GitHub secret: $var -- refusing to publish an un-notarized macOS binary!"
+              exit 1
+            fi
+          done
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASS="$(openssl rand -hex 24)"
+          CERT_PATH="$RUNNER_TEMP/dev_id.p12"
+          NOTARY_ZIP="$RUNNER_TEMP/blu_fx_notarize.zip"
+          NOTARY_JSON="$RUNNER_TEMP/notary_result.json"
+          NOTARY_ERR="$RUNNER_TEMP/notary_stderr.txt"
+
+          # 1. Decode .p12 certificate into an ephemeral build keychain:
+          echo "$MACOS_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychain -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+
+          # 2. Auto-discover Developer ID Application identity from the imported .p12:
+          SIGN_ID=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application:" | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          if [[ -z "$SIGN_ID" ]]; then
+            echo "::error::No 'Developer ID Application' identity found in MACOS_CERT_P12_BASE64!"
+            exit 1
+          fi
+          echo "Signing with identity: $SIGN_ID"
+
+          # 3. Code-sign with hardened runtime & secure timestamp:
+          codesign --force --timestamp --options=runtime --sign "$SIGN_ID" "$PLUGIN"
+          codesign --verify --strict --verbose=2 "$PLUGIN"
+          codesign -dvv "$PLUGIN" 2>&1 | grep -E "Authority=|TeamIdentifier=|Timestamp=|Signature="
+
+          # 4. Submit standalone .xpl (zipped) to Apple Notary Service and fail loudly if not Accepted:
+          ditto -c -k --keepParent "$PLUGIN" "$NOTARY_ZIP"
+          set +e
+          xcrun notarytool submit "$NOTARY_ZIP" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait \
+            --output-format json > "$NOTARY_JSON" 2> "$NOTARY_ERR"
+          NOTARY_RC=$?
+          set -e
+
+          cat "$NOTARY_JSON" || true
+          cat "$NOTARY_ERR" || true
+
+          STATUS=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("status",""))' "$NOTARY_JSON" 2>/dev/null || true)
+          SUB_ID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("id",""))' "$NOTARY_JSON" 2>/dev/null || true)
+
+          if [[ $NOTARY_RC -ne 0 || "$STATUS" != "Accepted" ]]; then
+            echo "::error::Apple notarization FAILED (rc=$NOTARY_RC, status='$STATUS'). If Apple updated its Developer Program License Agreement, sign in at https://developer.apple.com/account, accept it, and re-run!"
+            if [[ -n "$SUB_ID" ]]; then
+              xcrun notarytool log "$SUB_ID" \
+                --apple-id "$APPLE_ID" \
+                --team-id "$APPLE_TEAM_ID" \
+                --password "$APPLE_APP_PASSWORD" || true
+            fi
+            exit 1
+          fi
+          echo "Apple notarization ACCEPTED (submission id: $SUB_ID)!"
+
+      - name: Clean up temporary signing keychain
+        if: always() && github.event_name == 'workflow_call'
+        run: |
+          rm -f "$RUNNER_TEMP/dev_id.p12" "$RUNNER_TEMP/blu_fx_notarize.zip" "$RUNNER_TEMP/notary_result.json" "$RUNNER_TEMP/notary_stderr.txt"
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
+
       - uses: actions/upload-artifact@v4
         with:
           name: binaries-mac
