@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.9)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11" CACHE STRING "Minimum macOS version" FORCE)
 set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures for macOS" FORCE)
 
-project(blu_fx VERSION 2.0.0 DESCRIPTION "Blu-FX X-Plane plugin")
+project(blu_fx VERSION 2.1.0 DESCRIPTION "Blu-FX X-Plane plugin")
 
 # By default, use optimized release configuration.
 if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")

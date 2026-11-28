@@ -28,7 +28,7 @@
 #define NAME_BLANK "      "           /* to align multi-line log entries :-) */
 #define NAME_LOWERCASE "blu_fx"
 
-#define VERSION "2.0.0"
+#define VERSION "2.1.0b1"
 #define VERSION_BLANK "     "         /* to align multi-line log entries :-) */
 
 // Define qualified name that includes version (e.g., "BLU-fx v1.3.0")
@@ -72,6 +72,8 @@
 #define DEFAULT_RALEIGH_SCALE 13.0f
 #define DEFAULT_MAX_FRAME_RATE 30.0f
 #define DEFAULT_DISABLE_CINEMA_VERITE_TIME 5.0f
+#define DEFAULT_GAMMA 1.0f
+#define DEFAULT_NIGHT_FILTER_STRENGTH 0.45f
 
 enum BLUfxPresets_t
 {
@@ -117,6 +119,18 @@ struct BLUfxPreset_t
     float raleighScale;
     float maxFps;
     float disableCinemaVeriteTime;
+    // v2.1 extended tone, color & optics (neutral defaults keep v1.x/v2.0 presets identical)
+    float shadows = 0.0f;
+    float highlights = 0.0f;
+    float gammaVal = DEFAULT_GAMMA;
+    float temperature = 0.0f;
+    float tint = 0.0f;
+    float vibrance = 0.0f;
+    float sharpen = 0.0f;
+    float filmGrain = 0.0f;
+    int filmicRolloff = 0;
+    int nightFilterEnabled = 0;
+    float nightFilterStrength = DEFAULT_NIGHT_FILTER_STRENGTH;
 };
 typedef BLUfxPreset_t BLUfxPreset;
 
@@ -148,6 +162,24 @@ extern float greenOffset;
 extern float blueOffset;
 extern float vignette;
 extern float raleighScale;
+
+// v2.1 extended adjustments & effects:
+extern float shadows;
+extern float highlights;
+extern float gammaVal;
+extern float temperature;
+extern float tint;
+extern float vibrance;
+extern float sharpen;
+extern float filmGrain;
+extern int filmicRolloff;
+extern int nightFilterEnabled;
+extern float nightFilterStrength;
+
+// Session-only per-section bypass flags (for live A/B auditing in accordion UI):
+extern bool sBypassTone;
+extern bool sBypassRgb;
+extern bool sBypassOptics;
 
 // Core plugin actions exposed to SettingsImgWindow:
 bool isActivePreset(const BLUfxPreset_t* preset);
@@ -183,8 +215,15 @@ enum BluFxPreviewMode {
     PREVIEW_MODE_FULL  = 1
 };
 
+enum BluFxSplitOrientation {
+    SPLIT_ORIENT_VERTICAL   = 0,
+    SPLIT_ORIENT_HORIZONTAL = 1
+};
+
 extern int sPreviewMode;
 extern float sPreviewSplitPosition;
+extern int sPreviewSplitOrientation;
+extern bool sPreviewSplitFlipped;
 extern bool sMomentaryFullView;
 extern bool sShowSplitDivider;
 void SetMomentaryFullView(bool active);

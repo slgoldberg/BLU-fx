@@ -117,6 +117,7 @@ bool InitializeImGui()
                         ICON_FA_EXCLAMATION_CIRCLE
                         ICON_FA_EXCLAMATION_TRIANGLE
                         ICON_FA_EYE
+                        ICON_FA_EYE_SLASH
                         ICON_FA_EXTERNAL_LINK_SQUARE_ALT
                         ICON_FA_FAST_FORWARD
                         ICON_FA_FAST_BACKWARD
@@ -334,9 +335,10 @@ void TeardownImGui()
 // SettingsImgWindow Implementation
 // ============================================================================
 
-// In-memory saved window position across closes (non-persistent across sim sessions):
+// In-memory saved window position & auto-fit height across closes (non-persistent across sim sessions):
 static int sLastInSimLeft = -1;
 static int sLastInSimTop  = -1;
+static int sLastAutoHeight = 0;
 static bool sHasSavedPosition = false;
 
 static WindowGeometry CalcDefaultSettingsGeometry()
@@ -345,10 +347,9 @@ static WindowGeometry CalcDefaultSettingsGeometry()
     ImgWindow::GetMainMonitorBoundsGlobal(&screenL, &screenT, &screenR, &screenB);
 
     int w = SettingsImgWindow::DEFAULT_WIDTH;
-    int h = SettingsImgWindow::DEFAULT_HEIGHT;
-    if (LEGACY_FEATURES) {
-        h += 180; // Add room if XP11 Raleigh Scale, FPS-Limiter & Cinema Verite sections are shown
-    }
+    int h = (sLastAutoHeight >= 350 && sLastAutoHeight <= 1200)
+          ? sLastAutoHeight
+          : (SettingsImgWindow::DEFAULT_HEIGHT + (LEGACY_FEATURES ? 180 : 0));
 
     if (sHasSavedPosition || (sWindowTop > 0 && sWindowLeft != -1)) {
         int left = sHasSavedPosition ? sLastInSimLeft : sWindowLeft;
@@ -381,9 +382,9 @@ SettingsImgWindow::SettingsImgWindow()
                 true) // Enable ImGui mouse cursor handoff!
 {
     SetWindowTitle(NAME " v" VERSION " - Settings");
-    // Allow programmatic shrink-wrapping down to 480px while preventing user resize handles:
+    // Allow programmatic shrink-wrapping down to 360px while preventing user resize handles:
     int minW = SettingsImgWindow::DEFAULT_WIDTH;
-    int minH = 480;
+    int minH = 360;
     if (LEGACY_FEATURES) {
         minH += 180;
     }
@@ -609,18 +610,7 @@ static std::string GetSmartPresetDefaultFilename(int activeCuratedIdx, const std
     std::string baseName;
     if (activeCuratedIdx >= PRESET_POLAROID && activeCuratedIdx < PRESET_MAX) {
         baseName = BLUfxPresetNames[activeCuratedIdx];
-        const BLUfxPreset& cur = BLUfxPresets[activeCuratedIdx];
-        bool tweaked = (std::abs(brightness - cur.brightness) > 0.001f ||
-                        std::abs(contrast - cur.contrast) > 0.001f ||
-                        std::abs(saturation - cur.saturation) > 0.001f ||
-                        std::abs(redScale - cur.redScale) > 0.001f ||
-                        std::abs(greenScale - cur.greenScale) > 0.001f ||
-                        std::abs(blueScale - cur.blueScale) > 0.001f ||
-                        std::abs(redOffset - cur.redOffset) > 0.001f ||
-                        std::abs(greenOffset - cur.greenOffset) > 0.001f ||
-                        std::abs(blueOffset - cur.blueOffset) > 0.001f ||
-                        std::abs(vignette - cur.vignette) > 0.001f);
-        if (tweaked) {
+        if (!isActivePreset(&BLUfxPresets[activeCuratedIdx])) {
             baseName += "-custom";
         }
     } else if (!currentPresetFile.empty()) {
@@ -770,29 +760,67 @@ void SettingsImgWindow::buildInterface()
     // Row 2: Live Preview Mode & Split Curtain Wipe
     ImGui::Spacing();
 
-    // Row 2 Left: Split Wipe slider OR Fullscreen active text
+    // Row 2 Left: Split Wipe slider + Orientation (V/H) + Divider eye OR Fullscreen active text
     if (!ppEnabled) ImGui::BeginDisabled();
     if (sPreviewMode == PREVIEW_MODE_SPLIT) {
-        const float gap = ImGui::GetStyle().ItemSpacing.x;
+        const float gap = 4.0f;
         const float iconW = std::max(ImGui::CalcTextSize(ICON_FA_EYE).x, ImGui::CalcTextSize(ICON_FA_EYE_SLASH).x);
-        const float eyeBtnWidth = iconW + ImGui::GetStyle().FramePadding.x * 2.0f + 6.0f; // ~28px, comfortably fits FA eye-slash
-        const float eyeX = rightColX - gap - eyeBtnWidth;
-        const float sliderTotalWidth = (eyeX - gap) - ImGui::GetCursorPosX();
+        const float eyeBtnWidth = iconW + ImGui::GetStyle().FramePadding.x * 2.0f + 6.0f;
+        const float orientBtnWidth = eyeBtnWidth;
+        const float eyeX = rightColX - ImGui::GetStyle().ItemSpacing.x - eyeBtnWidth;
+        const float orientX = eyeX - gap - orientBtnWidth;
+        const float sliderTotalWidth = (orientX - gap) - ImGui::GetCursorPosX();
+
+        const bool isHoriz = (sPreviewSplitOrientation == SPLIT_ORIENT_HORIZONTAL);
+        const char* wipeFmt = isHoriz
+            ? (sPreviewSplitFlipped ? "FX / %.0f%% / Raw" : "Raw / %.0f%% / FX")
+            : (sPreviewSplitFlipped ? "FX | %.0f%% | Raw" : "Raw | %.0f%% | FX");
 
         ImGui::PushItemWidth(std::max(sliderTotalWidth, 80.0f));
         float splitPercent = sPreviewSplitPosition * 100.0f;
-        if (ImGui::SliderWithReset("##wipe_pos", &splitPercent, 50.0f, 5.0f, 95.0f, "Wipe: %.0f%%", 0, 1.0f)) {
+        if (ImGui::SliderWithReset("##wipe_pos", &splitPercent, 50.0f, 5.0f, 95.0f, wipeFmt, 0, 1.0f)) {
             sPreviewSplitPosition = splitPercent / 100.0f;
         }
         if (ImGui::IsItemDeactivatedAfterEdit()) {
             SavePreferences();
         }
         ImGui::PopItemWidth();
-        ImGui::TimedTooltip::TextMD(
-            "**Curtain Wipe Position:**\n"
-            "Adjust where the split screen boundary sits across your monitor (`5%%` to `95%%`).\n"
-            "*(Raw native scenery on the left, active color grade on the right)*"
-        );
+        const char* wipeDesc = isHoriz
+            ? (sPreviewSplitFlipped
+                ? "**Curtain Wipe (Horizontal -- BLU-fx Top / Raw Bottom):**\nAdjust where the split boundary sits (`5%%` to `95%%`)."
+                : "**Curtain Wipe (Horizontal -- Raw Top / BLU-fx Bottom):**\nAdjust where the split boundary sits (`5%%` to `95%%`).")
+            : (sPreviewSplitFlipped
+                ? "**Curtain Wipe (Vertical -- BLU-fx Left / Raw Right):**\nAdjust where the split boundary sits (`5%%` to `95%%`)."
+                : "**Curtain Wipe (Vertical -- Raw Left / BLU-fx Right):**\nAdjust where the split boundary sits (`5%%` to `95%%`).");
+        ImGui::TimedTooltip::TextMD(wipeDesc);
+
+        ImGui::SameLine(orientX);
+        if (ImGui::ButtonLink(isHoriz ? ICON_FA_ARROWS_ALT_V "##orient" : ICON_FA_ARROWS_ALT_H "##orient", ImVec2(orientBtnWidth, 0.0f))) {
+            // Cycle through all 4 split layouts: V(Raw|FX) -> V(FX|Raw) -> H(Raw/FX) -> H(FX/Raw)
+            if (!isHoriz && !sPreviewSplitFlipped) {
+                sPreviewSplitFlipped = true;
+            } else if (!isHoriz && sPreviewSplitFlipped) {
+                sPreviewSplitOrientation = SPLIT_ORIENT_HORIZONTAL;
+                sPreviewSplitFlipped = false;
+            } else if (isHoriz && !sPreviewSplitFlipped) {
+                sPreviewSplitFlipped = true;
+            } else {
+                sPreviewSplitOrientation = SPLIT_ORIENT_VERTICAL;
+                sPreviewSplitFlipped = false;
+            }
+            SavePreferences();
+        }
+        if (!IsWindowMoving() && ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+            sPreviewSplitFlipped = !sPreviewSplitFlipped;
+            SavePreferences();
+        }
+        ImGui::TimedTooltip::TextMD(isHoriz
+            ? (sPreviewSplitFlipped
+                ? "**Split Layout:** Horizontal (`BLU-fx` on top, `RAW` on bottom).\nClick to cycle orientation & side (right-click to flip sides)."
+                : "**Split Layout:** Horizontal (`RAW` on top, `BLU-fx` on bottom).\nClick to cycle orientation & side (right-click to flip sides).")
+            : (sPreviewSplitFlipped
+                ? "**Split Layout:** Vertical (`BLU-fx` on left, `RAW` on right).\nClick to cycle orientation & side (right-click to flip sides)."
+                : "**Split Layout:** Vertical (`RAW` on left, `BLU-fx` on right).\nClick to cycle orientation & side (right-click to flip sides)."));
 
         ImGui::SameLine(eyeX);
         if (ImGui::ButtonLink(sShowSplitDivider ? ICON_FA_EYE "##div" : ICON_FA_EYE_SLASH "##div", ImVec2(eyeBtnWidth, 0.0f))) {
@@ -800,8 +828,8 @@ void SettingsImgWindow::buildInterface()
             SavePreferences();
         }
         ImGui::TimedTooltip::TextMD(sShowSplitDivider
-            ? "Split hairline divider is **ON**.\nClick to hide for direct edge-to-edge pixel comparison."
-            : "Split hairline divider is **OFF**.\nClick to show the vertical split boundary.");
+            ? "Split divider line & `RAW` / `BLU-fx` badges are **ON**.\nClick to hide for clean edge-to-edge pixel comparison."
+            : "Split divider line & `RAW` / `BLU-fx` badges are **OFF**.\nClick to show the split boundary and side labels.");
     } else {
         ImGui::AlignTextToFramePadding();
         ImGui::TextDisabled(ICON_FA_DESKTOP " Full-screen live grading active");
@@ -979,52 +1007,271 @@ void SettingsImgWindow::buildInterface()
 
 #else
     // ------------------------------------------------------------------------
-    // Classic Post-Processing Sliders (SliderWithReset)
+    // Solo Accordion Post-Processing Panels (1 open at a time; all active)
     // ------------------------------------------------------------------------
-    const float sliderWidth = leftColWidth - 88.0f;
-    ImGui::PushItemWidth(sliderWidth);
+    static int s_OpenPanel = 0; // 0 = Tone & Color, 1 = RGB Channels, 2 = Optics & Effects
 
-    // 1-boxel subtle navy border around transparent slider tracks for visual structure:
+    auto isNear = [](float a, float b) { return std::abs(a - b) < 0.005f; };
+    auto appendVal = [&](std::string& s, const char* tag, float val, float defVal, bool signedFmt = true) {
+        if (isNear(val, defVal)) return;
+        char b[32];
+        if (signedFmt) std::snprintf(b, sizeof(b), "%s%+.2f", tag, val);
+        else           std::snprintf(b, sizeof(b), "%s%.2f", tag, val);
+        if (!s.empty()) s += " ";
+        s += b;
+    };
+
+    // Build compact live summaries for collapsed accordion headers:
+    std::string toneSummary;
+    appendVal(toneSummary, "B", brightness, def.brightness);
+    appendVal(toneSummary, "C", contrast, def.contrast, false);
+    appendVal(toneSummary, "Sh", shadows, def.shadows);
+    appendVal(toneSummary, "Hi", highlights, def.highlights);
+    appendVal(toneSummary, "G", gammaVal, def.gammaVal, false);
+    appendVal(toneSummary, "T", temperature, def.temperature);
+    appendVal(toneSummary, "Tn", tint, def.tint);
+    appendVal(toneSummary, "S", saturation, def.saturation, false);
+    appendVal(toneSummary, "V", vibrance, def.vibrance);
+    const bool toneModified = !toneSummary.empty();
+
+    std::string rgbSummary;
+    appendVal(rgbSummary, "Rs", redScale, def.redScale);
+    appendVal(rgbSummary, "Gs", greenScale, def.greenScale);
+    appendVal(rgbSummary, "Bs", blueScale, def.blueScale);
+    appendVal(rgbSummary, "Ro", redOffset, def.redOffset);
+    appendVal(rgbSummary, "Go", greenOffset, def.greenOffset);
+    appendVal(rgbSummary, "Bo", blueOffset, def.blueOffset);
+    const bool rgbModified = !rgbSummary.empty();
+
+    std::string opticsSummary;
+    appendVal(opticsSummary, "Shp", sharpen, def.sharpen, false);
+    appendVal(opticsSummary, "Vig", vignette, def.vignette, false);
+    appendVal(opticsSummary, "Grn", filmGrain, def.filmGrain, false);
+    if (filmicRolloff) {
+        if (!opticsSummary.empty()) opticsSummary += " ";
+        opticsSummary += "Filmic";
+    }
+    if (nightFilterEnabled) {
+        if (!opticsSummary.empty()) opticsSummary += " ";
+        char b[24];
+        std::snprintf(b, sizeof(b), "Night%.0f%%", nightFilterStrength * 100.0f);
+        opticsSummary += b;
+    }
+    const bool opticsModified = !opticsSummary.empty();
+
+    auto DrawAccordionHeader = [&](int panelIdx, const char* title, const std::string& summary,
+                                   bool modified, bool* bypassFlag, const char* headerTooltip) -> bool {
+        const bool isOpen = (s_OpenPanel == panelIdx);
+        const bool isBypassed = (bypassFlag && *bypassFlag);
+        const float eyeW = 24.0f;
+        const float hdrW = leftColWidth - eyeW - 3.0f;
+        const float hdrH = ImGui::GetFrameHeight();
+
+        // Header button styling:
+        if (isOpen) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.30f, 0.46f, 0.92f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.36f, 0.55f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.24f, 0.40f, 0.60f, 1.00f));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.18f, 0.24f, 0.85f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.26f, 0.35f, 0.95f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.22f, 0.30f, 0.42f, 1.00f));
+        }
+        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+
+        std::string label = std::string(isOpen ? ICON_FA_CHEVRON_DOWN "  " : ICON_FA_CHEVRON_RIGHT "  ") + title;
+        if (isBypassed) {
+            label += "  [bypassed]";
+        } else if (!isOpen && modified) {
+            label += "  (" + summary + ")";
+        }
+
+        // Truncate overly long summary so it never spills outside the header button:
+        if (label.size() > 44) {
+            label = label.substr(0, 41) + "...)";
+        }
+        label += "##acc_hdr_" + std::to_string(panelIdx);
+
+        if (ImGui::ButtonLink(label.c_str(), ImVec2(hdrW, hdrH))) {
+            s_OpenPanel = panelIdx;
+            ImGui::TimedTooltip::ClearActiveTooltip();
+        }
+        ImGui::PopStyleVar(1);
+        ImGui::PopStyleColor(3);
+
+        if (headerTooltip) {
+            std::string fullTip = headerTooltip;
+            if (!isOpen && modified) {
+                fullTip += "\n\n**Active:** `" + summary + "`";
+            }
+            ImGui::TimedTooltip::TextMD(fullTip.c_str());
+        }
+
+        // Right-aligned per-section bypass eye toggle:
+        ImGui::SameLine(0.0f, 3.0f);
+        if (isBypassed) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.80f, 0.48f, 0.14f, 0.90f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.90f, 0.58f, 0.20f, 1.00f));
+        } else if (modified) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.34f, 0.48f, 0.85f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.44f, 0.62f, 1.00f));
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.14f, 0.18f, 0.24f, 0.65f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.26f, 0.35f, 0.85f));
+        }
+        std::string eyeId = std::string(isBypassed ? ICON_FA_EYE_SLASH : ICON_FA_EYE) + "##acc_eye_" + std::to_string(panelIdx);
+        if (ImGui::ButtonLink(eyeId.c_str(), ImVec2(eyeW, hdrH))) {
+            if (bypassFlag) *bypassFlag = !(*bypassFlag);
+            ImGui::TimedTooltip::ClearActiveTooltip();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::TimedTooltip::TextMD(isBypassed
+            ? ("**" + std::string(title) + " is BYPASSED.**\nClick to re-enable this group's adjustments in the shader.").c_str()
+            : ("**" + std::string(title) + " is ACTIVE.**\nClick to momentarily bypass just this group for A/B comparison.").c_str());
+
+        return isOpen;
+    };
+
+    const float sliderWidth = leftColWidth - 96.0f;
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
     ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.10f, 0.14f, 0.22f, 0.85f));
-    // Boost slider grab (thumb) opacity/vibrancy by ~15% for crisp visibility under Metal/Panel Graphics:
     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.28f, 0.60f, 0.96f, 1.00f));
     ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.34f, 0.68f, 1.00f, 1.00f));
 
-    ImGui::SliderWithReset("Brightness", &brightness, def.brightness, -0.50f, 0.50f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Adjusts overall scene luminance offset (`-0.50` to `+0.50`).");
+    // ---- Panel 0: Tone & Color (9 sliders) ----
+    if (DrawAccordionHeader(0, "Tone & Color", toneSummary, toneModified, &sBypassTone,
+                            "**Tone & Color:** Primary exposure, shadow/highlight recovery, gamma, white balance, and color intensity.")) {
+        if (sBypassTone) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.55f);
+        ImGui::PushItemWidth(sliderWidth);
 
-    ImGui::SliderWithReset("Contrast", &contrast, def.contrast, 0.05f, 2.00f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Adjusts dynamic range separation (`0.05` to `2.00`, default `1.00`).");
+        ImGui::SliderWithReset("Brightness", &brightness, def.brightness, -0.50f, 0.50f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Overall scene luminance offset (`-0.50` to `+0.50`).");
 
-    ImGui::SliderWithReset("Saturation", &saturation, def.saturation, 0.00f, 2.50f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Adjusts color intensity (`0.00` = monochrome, `1.00` = normal, up to `2.50`).");
+        ImGui::SliderWithReset("Contrast", &contrast, def.contrast, 0.05f, 2.00f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Dynamic range separation (`0.05` to `2.00`, default `1.00`).");
 
-    ImGui::SliderWithReset("Red Scale", &redScale, def.redScale, -0.75f, 0.75f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Non-linear mid-tone curve boost/cut for the **Red** channel (`-0.75` to `+0.75`).");
+        ImGui::SliderWithReset("Shadows", &shadows, def.shadows, -1.00f, 1.00f, "%.2f", 0, 0.02f);
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Lifts or deepens **dark tones** (ideal for brightening dark XP12 cockpits without blowing out bright sky).");
 
-    ImGui::SliderWithReset("Green Scale", &greenScale, def.greenScale, -0.75f, 0.75f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Non-linear mid-tone curve boost/cut for the **Green** channel (`-0.75` to `+0.75`).");
+        ImGui::SliderWithReset("Highlights", &highlights, def.highlights, -1.00f, 1.00f, "%.2f", 0, 0.02f);
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Recovers or boosts **bright tones** (negative values pull back blown-out clouds and glare).");
 
-    ImGui::SliderWithReset("Blue Scale", &blueScale, def.blueScale, -0.75f, 0.75f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Non-linear mid-tone curve boost/cut for the **Blue** channel (`-0.75` to `+0.75`).");
+        ImGui::SliderWithReset("Gamma", &gammaVal, def.gammaVal, 0.50f, 2.00f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Midtone luminance curve (`0.50` darker midtones, `1.00` neutral, `2.00` brighter midtones).");
 
-    ImGui::SliderWithReset("Red Offset", &redOffset, def.redOffset, -0.50f, 0.50f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Linear additive shift for the **Red** channel (`-0.50` to `+0.50`).");
+        ImGui::SliderWithReset("Temperature", &temperature, def.temperature, -1.00f, 1.00f, "%.2f", 0, 0.02f);
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  White balance warmth (`-1.00` cool blue to `+1.00` warm golden).");
 
-    ImGui::SliderWithReset("Green Offset", &greenOffset, def.greenOffset, -0.50f, 0.50f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Linear additive shift for the **Green** channel (`-0.50` to `+0.50`).");
+        ImGui::SliderWithReset("Tint", &tint, def.tint, -1.00f, 1.00f, "%.2f", 0, 0.02f);
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Green / magenta color cast shift (`-1.00` green to `+1.00` magenta).");
 
-    ImGui::SliderWithReset("Blue Offset", &blueOffset, def.blueOffset, -0.50f, 0.50f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Linear additive shift for the **Blue** channel (`-0.50` to `+0.50`).");
+        ImGui::SliderWithReset("Saturation", &saturation, def.saturation, 0.00f, 2.50f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Uniform color intensity (`0.00` monochrome, `1.00` normal, up to `2.50`).");
 
-    const float bottomSliderY = ImGui::GetCursorPosY();
-    ImGui::SliderWithReset("Vignette", &vignette, def.vignette, 0.00f, 1.00f, "%.2f", 0, 0.01f);
-    ImGui::TimedTooltip::TextMD("Darkens the outer edges of the screen (`0.00` = off, `1.00` = maximum vignette).");
+        ImGui::SliderWithReset("Vibrance", &vibrance, def.vibrance, -1.00f, 1.00f, "%.2f", 0, 0.02f);
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Smart saturation that boosts muted terrain and foliage while protecting already-vivid skies.");
+
+        ImGui::PopItemWidth();
+        if (sBypassTone) ImGui::PopStyleVar(1);
+        ImGui::Spacing();
+    }
+
+    // ---- Panel 1: RGB Channels (6 sliders, color-coded grabs) ----
+    if (DrawAccordionHeader(1, "RGB Channels", rgbSummary, rgbModified, &sBypassRgb,
+                            "**RGB Channels:** Per-channel mid-tone curve scale and linear offset (used by classic presets and fine tinting).")) {
+        if (sBypassRgb) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.55f);
+        ImGui::PushItemWidth(sliderWidth);
+
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.90f, 0.32f, 0.32f, 1.00f));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.00f, 0.42f, 0.42f, 1.00f));
+        ImGui::SliderWithReset("Red Scale", &redScale, def.redScale, -0.75f, 0.75f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Non-linear mid-tone curve boost/cut for the **Red** channel (`-0.75` to `+0.75`).");
+        ImGui::PopStyleColor(2);
+
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.30f, 0.80f, 0.40f, 1.00f));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.40f, 0.92f, 0.50f, 1.00f));
+        ImGui::SliderWithReset("Green Scale", &greenScale, def.greenScale, -0.75f, 0.75f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Non-linear mid-tone curve boost/cut for the **Green** channel (`-0.75` to `+0.75`).");
+        ImGui::PopStyleColor(2);
+
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.32f, 0.62f, 0.98f, 1.00f));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.42f, 0.72f, 1.00f, 1.00f));
+        ImGui::SliderWithReset("Blue Scale", &blueScale, def.blueScale, -0.75f, 0.75f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Non-linear mid-tone curve boost/cut for the **Blue** channel (`-0.75` to `+0.75`).");
+        ImGui::PopStyleColor(2);
+
+        ImGui::Spacing();
+
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.90f, 0.32f, 0.32f, 1.00f));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.00f, 0.42f, 0.42f, 1.00f));
+        ImGui::SliderWithReset("Red Offset", &redOffset, def.redOffset, -0.50f, 0.50f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Linear additive shift for the **Red** channel (`-0.50` to `+0.50`).");
+        ImGui::PopStyleColor(2);
+
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.30f, 0.80f, 0.40f, 1.00f));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.40f, 0.92f, 0.50f, 1.00f));
+        ImGui::SliderWithReset("Green Offset", &greenOffset, def.greenOffset, -0.50f, 0.50f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Linear additive shift for the **Green** channel (`-0.50` to `+0.50`).");
+        ImGui::PopStyleColor(2);
+
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.32f, 0.62f, 0.98f, 1.00f));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.42f, 0.72f, 1.00f, 1.00f));
+        ImGui::SliderWithReset("Blue Offset", &blueOffset, def.blueOffset, -0.50f, 0.50f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Linear additive shift for the **Blue** channel (`-0.50` to `+0.50`).");
+        ImGui::PopStyleColor(2);
+
+        ImGui::PopItemWidth();
+        if (sBypassRgb) ImGui::PopStyleVar(1);
+        ImGui::Spacing();
+    }
+
+    // ---- Panel 2: Optics & Effects (Sliders + Toggles with Parameter) ----
+    if (DrawAccordionHeader(2, "Optics & Effects", opticsSummary, opticsModified, &sBypassOptics,
+                            "**Optics & Effects:** Adaptive sharpening, lens vignette, film grain, highlight roll-off, and night-room filter.")) {
+        if (sBypassOptics) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.55f);
+        ImGui::PushItemWidth(sliderWidth);
+
+        ImGui::SliderWithReset("Sharpen", &sharpen, def.sharpen, 0.00f, 1.00f, "%.2f", 0, 0.02f);
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Contrast-adaptive sharpening (CAS-style) for crisper cockpit gauges and distant runways without white halos.");
+
+        ImGui::SliderWithReset("Vignette", &vignette, def.vignette, 0.00f, 1.00f, "%.2f", 0, 0.01f);
+        ImGui::TimedTooltip::TextMD("Darkens the outer edges of the screen (`0.00` off, `1.00` max).");
+
+        ImGui::SliderWithReset("Film Grain", &filmGrain, def.filmGrain, 0.00f, 1.00f, "%.2f", 0, 0.02f);
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Subtle animated procedural film grain weighted toward midtones (`0.00` off).");
+
+        ImGui::Spacing();
+
+        bool filmicOn = (filmicRolloff != 0);
+        if (ImGui::ToggleButton("Filmic Highlight Roll-off", &filmicOn)) {
+            filmicRolloff = filmicOn ? 1 : 0;
+        }
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Soft shoulder compression above 72%% luminance so boosting Contrast or Brightness won't clip bright clouds into flat white.");
+
+        bool nightOn = (nightFilterEnabled != 0);
+        if (ImGui::ToggleButton("Night-Room Filter", &nightOn)) {
+            nightFilterEnabled = nightOn ? 1 : 0;
+        }
+        ImGui::TimedTooltip::TextMD("<badge cyan>New in v2.1</badge>  Cuts harsh blue light and softens glare for dark-room night flying without changing your daytime tone sliders.");
+
+        if (!nightOn) ImGui::BeginDisabled();
+        ImGui::SliderWithReset("Night Strength", &nightFilterStrength, DEFAULT_NIGHT_FILTER_STRENGTH, 0.05f, 1.00f, "%.2f", 0, 0.02f);
+        if (!nightOn) ImGui::EndDisabled();
+        ImGui::TimedTooltip::TextMDProxy(
+            ImGui::GetItemID(),
+            ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled),
+            nightOn ? "Controls the intensity of the warm night-room blue-light cut (`0.05` to `1.00`)."
+                    : "Enable **Night-Room Filter** above to adjust strength."
+        );
+
+        ImGui::PopItemWidth();
+        if (sBypassOptics) ImGui::PopStyleVar(1);
+    }
+
+    const float bottomSliderY = ImGui::GetCursorPosY() - ImGui::GetFrameHeight();
 
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar(1);
-    ImGui::PopItemWidth();
 #endif
     const float leftColBottomY = ImGui::GetCursorPosY();
     ImGui::Dummy(ImVec2(0.0f, 0.0f)); // Consumes cursor position to cleanly close group boundary without assert
@@ -1045,14 +1292,17 @@ void SettingsImgWindow::buildInterface()
     // Top Pair: Reset All (aligns with top slider) & Restore (VG below)
     // --------------------------------------------------------------------
     ImGui::SetCursorPosY(topSliderY);
-    if (isDefaultActive) ImGui::BeginDisabled();
+    if (isDefaultActive && !sBypassTone && !sBypassRgb && !sBypassOptics) ImGui::BeginDisabled();
     if (ImGui::ButtonLink(ICON_FA_UNDO " Reset All", actionBtnSize)) {
         ApplyPreset(PRESET_DEFAULT);
+        sBypassTone = false;
+        sBypassRgb = false;
+        sBypassOptics = false;
         s_SelectedPresetFilename.clear();
         s_ActiveCuratedPresetIdx = -1;
         ImGui::TimedTooltip::ClearActiveTooltip();
     }
-    if (isDefaultActive) ImGui::EndDisabled();
+    if (isDefaultActive && !sBypassTone && !sBypassRgb && !sBypassOptics) ImGui::EndDisabled();
     ImGui::TimedTooltip::TextMDProxy(
         ImGui::GetItemID(),
         ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled),
@@ -1485,29 +1735,29 @@ void SettingsImgWindow::buildInterface()
     ImGui::Spacing();
 
     // ------------------------------------------------------------------------
-    // Section 2: Presets (Italics Typography)
+    // Section 2: Presets (Compact 3-Column x 6-Row Grid)
     // ------------------------------------------------------------------------
-    if (IM_BOLD_LARGER_FONT) ImGui::PushFont(IM_BOLD_LARGER_FONT);
+    if (IM_BOLD_FONT) ImGui::PushFont(IM_BOLD_FONT);
     ImGui::TextUnformatted("Presets");
-    if (IM_BOLD_LARGER_FONT) ImGui::PopFont();
-    ImGui::TimedTooltip::TextMD("Click any preset button below to immediately apply that style.");
+    if (IM_BOLD_FONT) ImGui::PopFont();
+    ImGui::TimedTooltip::TextMD("Click any preset button below to immediately apply that style (click again to toggle off).");
 
     ImGui::BeginGroup();
-    // 1-boxel subtle navy border around preset buttons for visual structure:
+    // 1-boxel subtle navy border + comfortable vertical padding for 3x6 preset buttons:
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 3.5f));
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(3.0f, 2.0f));
     ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.12f, 0.18f, 0.28f, 0.85f));
 
-    if (IM_ITALIC_FONT) ImGui::PushFont(IM_ITALIC_FONT);
-    if (ImGui::BeginTable("##PresetsGrid", 2, ImGuiTableFlags_SizingStretchSame)) {
-        // Render the 18 curated presets in two columns (matching legacy layout order: 2..10 left, 11..19 right):
-        const int halfCount = 9;
-        for (int row = 0; row < halfCount; ++row) {
+    if (IM_SMALLER_FONT) ImGui::PushFont(IM_SMALLER_FONT);
+    if (ImGui::BeginTable("##PresetsGrid", 3, ImGuiTableFlags_SizingStretchSame)) {
+        // Render the 18 curated presets in 3 columns x 6 rows (column-major reading order):
+        const int rowCount = 6;
+        for (int row = 0; row < rowCount; ++row) {
             ImGui::TableNextRow();
-            const int indices[2] = { PRESET_POLAROID + row, PRESET_SHINY_CALIFORNIA + row };
-
-            for (int col = 0; col < 2; ++col) {
+            for (int col = 0; col < 3; ++col) {
                 ImGui::TableSetColumnIndex(col);
-                int pIdx = indices[col];
+                int pIdx = PRESET_POLAROID + col * rowCount + row;
                 if (pIdx >= PRESET_MAX) continue;
 
                 bool isBasePreset = (s_ActiveCuratedPresetIdx == pIdx);
@@ -1579,9 +1829,9 @@ void SettingsImgWindow::buildInterface()
         }
         ImGui::EndTable();
     }
-    if (IM_ITALIC_FONT) ImGui::PopFont();
+    if (IM_SMALLER_FONT) ImGui::PopFont();
     ImGui::PopStyleColor(1);
-    ImGui::PopStyleVar(1);
+    ImGui::PopStyleVar(3);
     ImGui::EndGroup();
 
     // ------------------------------------------------------------------------
@@ -1734,9 +1984,12 @@ void SettingsImgWindow::buildInterface()
     // Defensive bounds guard: height must be realistic (min 350px, max 1200px)
     constexpr int minValidH = 350;
     constexpr int maxValidH = 1200;
-    if (targetH >= minValidH && targetH <= maxValidH && std::abs(currentH - targetH) > 1 && !IsPoppedOut()) {
-        auto geom = WindowGeometry::FromTopLeft(left, top, right - left, targetH);
-        SetWindowGeometry(geom.left, geom.top, geom.right, geom.bottom);
+    if (targetH >= minValidH && targetH <= maxValidH) {
+        sLastAutoHeight = targetH;
+        if (std::abs(currentH - targetH) > 1 && !IsPoppedOut()) {
+            auto geom = WindowGeometry::FromTopLeft(left, top, right - left, targetH);
+            SetWindowGeometry(geom.left, geom.top, geom.right, geom.bottom);
+        }
     }
 
     // Continuously remember window position in-memory and update preferences:

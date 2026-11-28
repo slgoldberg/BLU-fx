@@ -55,8 +55,8 @@ public:
     static constexpr int DEFAULT_WIDTH       = 520;
     static constexpr int DEFAULT_HEIGHT      = 555;
 #else
-    static constexpr int DEFAULT_WIDTH       = 465;
-    static constexpr int DEFAULT_HEIGHT      = 555;
+    static constexpr int DEFAULT_WIDTH       = 485;
+    static constexpr int DEFAULT_HEIGHT      = 505;
 #endif
 #else
     static constexpr int DEFAULT_WIDTH       = 430;

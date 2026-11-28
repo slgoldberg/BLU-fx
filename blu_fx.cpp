@@ -449,6 +449,12 @@ BLUfxPreset BLUfxPresets [PRESET_MAX] =
                         "uniform float brightness;"\
                         "uniform float contrast;"\
                         "uniform float saturation;"\
+                        "uniform float shadows;"\
+                        "uniform float highlights;"\
+                        "uniform float gammaVal;"\
+                        "uniform float temperature;"\
+                        "uniform float tint;"\
+                        "uniform float vibrance;"\
                         "uniform float redScale;"\
                         "uniform float greenScale;"\
                         "uniform float blueScale;"\
@@ -457,14 +463,67 @@ BLUfxPreset BLUfxPresets [PRESET_MAX] =
                         "uniform float blueOffset;"\
                         "uniform vec2 resolution;"\
                         "uniform float vignette;"\
+                        "uniform float sharpen;"\
+                        "uniform float filmGrain;"\
+                        "uniform float filmicRolloff;"\
+                        "uniform float nightFilter;"\
+                        "uniform float frameSeed;"\
                         "uniform sampler2D scene;"\
                         "void main()"\
                         "{"\
                             "vec3 color = texture2D(scene, gl_TexCoord[0].st).rgb;"\
+                            "if (sharpen > 0.001) {"\
+                                "vec2 px = 1.0 / resolution.xy;"\
+                                "vec3 n = texture2D(scene, gl_TexCoord[0].st + vec2(0.0, px.y)).rgb;"\
+                                "vec3 s = texture2D(scene, gl_TexCoord[0].st - vec2(0.0, px.y)).rgb;"\
+                                "vec3 e = texture2D(scene, gl_TexCoord[0].st + vec2(px.x, 0.0)).rgb;"\
+                                "vec3 w = texture2D(scene, gl_TexCoord[0].st - vec2(px.x, 0.0)).rgb;"\
+                                "vec3 avg = (n + s + e + w) * 0.25;"\
+                                "vec3 minC = min(color, min(min(n, s), min(e, w)));"\
+                                "vec3 maxC = max(color, max(max(n, s), max(e, w)));"\
+                                "vec3 amp = clamp(min(minC, vec3(1.0) - maxC) / max(maxC, vec3(0.001)), 0.0, 1.0);"\
+                                "vec3 sharp = color + (color - avg) * (sharpen * 1.8) * (0.35 + 0.65 * sqrt(amp));"\
+                                "color = clamp(sharp, minC * 0.85, min(vec3(1.0), maxC * 1.15));"\
+                            "}"\
                             "color *= contrast;"\
                             "color += vec3(brightness, brightness, brightness);"\
+                            "if (abs(shadows) > 0.001 || abs(highlights) > 0.001) {"\
+                                "vec3 c0 = clamp(color, 0.0, 1.0);"\
+                                "float luma = dot(c0, lumCoeff);"\
+                                "float shadowMask = (1.0 - luma) * (1.0 - luma);"\
+                                "float highMask = luma * luma;"\
+                                "color += c0 * (shadows * 0.55 * shadowMask) + vec3(shadows * 0.10 * shadowMask);"\
+                                "color += (vec3(1.0) - c0 * 0.35) * (highlights * 0.45 * highMask);"\
+                            "}"\
+                            "if (abs(gammaVal - 1.0) > 0.001) {"\
+                                "color = pow(max(color, vec3(0.0)), vec3(1.0 / max(gammaVal, 0.1)));"\
+                            "}"\
+                            "if (abs(temperature) > 0.001 || abs(tint) > 0.001) {"\
+                                "vec3 wb = vec3(1.0 + temperature * 0.18 + tint * 0.08, 1.0 - tint * 0.14, 1.0 - temperature * 0.18 + tint * 0.08);"\
+                                "float origLum = dot(max(color, vec3(0.0)), lumCoeff);"\
+                                "color *= wb;"\
+                                "float newLum = dot(max(color, vec3(0.0)), lumCoeff);"\
+                                "if (newLum > 0.0001) {"\
+                                    "color *= mix(1.0, origLum / newLum, 0.65);"\
+                                "}"\
+                            "}"\
                             "vec3 intensity = vec3(dot(color, lumCoeff));"\
                             "color = mix(intensity, color, saturation);"\
+                            "if (abs(vibrance) > 0.001) {"\
+                                "vec3 c0 = clamp(color, 0.0, 1.0);"\
+                                "float mx = max(c0.r, max(c0.g, c0.b));"\
+                                "float mn = min(c0.r, min(c0.g, c0.b));"\
+                                "float sat = mx - mn;"\
+                                "float vibFactor = 1.0 + vibrance * (1.0 - sat);"\
+                                "vec3 vLum = vec3(dot(color, lumCoeff));"\
+                                "color = mix(vLum, color, vibFactor);"\
+                            "}"\
+                            "if (filmicRolloff > 0.5) {"\
+                                "const float knee = 0.72;"\
+                                "vec3 over = max(color - vec3(knee), vec3(0.0));"\
+                                "vec3 rolled = vec3(knee) + over / (vec3(1.0) + over / (1.0 - knee));"\
+                                "color = mix(color, rolled, step(vec3(knee), color));"\
+                            "}"\
                             "vec3 newColor = (color.rgb - 0.5) * 2.0;"\
                             "newColor.r = 2.0 / 3.0 * (1.0 - (newColor.r * newColor.r));"\
                             "newColor.g = 2.0 / 3.0 * (1.0 - (newColor.g * newColor.g));"\
@@ -477,6 +536,17 @@ BLUfxPreset BLUfxPresets [PRESET_MAX] =
                             "float len = length(position);"\
                             "float vig = smoothstep(0.75, 0.75 - 0.45, len);"\
                             "color = mix(color, color * vig, vignette);"\
+                            "if (filmGrain > 0.001) {"\
+                                "vec2 gp = gl_FragCoord.xy + vec2(frameSeed * 17.3, frameSeed * 31.7);"\
+                                "float gn = fract(sin(dot(gp, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;"\
+                                "float gLum = dot(color, lumCoeff);"\
+                                "float gMask = 4.0 * gLum * (1.0 - gLum);"\
+                                "color = clamp(color + vec3(gn * filmGrain * 0.14 * (0.25 + 0.75 * gMask)), 0.0, 1.0);"\
+                            "}"\
+                            "if (nightFilter > 0.001) {"\
+                                "vec3 nightMul = vec3(1.0 - 0.15 * nightFilter, 1.0 - 0.34 * nightFilter, 1.0 - 0.62 * nightFilter);"\
+                                "color *= nightMul;"\
+                            "}"\
                             "gl_FragColor = vec4(color, 1.0);"\
                         "}"
 
@@ -503,9 +573,80 @@ float blueOffset = BLUfxPresets[PRESET_DEFAULT].blueOffset;
 float vignette = BLUfxPresets[PRESET_DEFAULT].vignette;
 float raleighScale = DEFAULT_RALEIGH_SCALE;
 
+// v2.1 extended adjustments & effects:
+float shadows = BLUfxPresets[PRESET_DEFAULT].shadows;
+float highlights = BLUfxPresets[PRESET_DEFAULT].highlights;
+float gammaVal = BLUfxPresets[PRESET_DEFAULT].gammaVal;
+float temperature = BLUfxPresets[PRESET_DEFAULT].temperature;
+float tint = BLUfxPresets[PRESET_DEFAULT].tint;
+float vibrance = BLUfxPresets[PRESET_DEFAULT].vibrance;
+float sharpen = BLUfxPresets[PRESET_DEFAULT].sharpen;
+float filmGrain = BLUfxPresets[PRESET_DEFAULT].filmGrain;
+int filmicRolloff = BLUfxPresets[PRESET_DEFAULT].filmicRolloff;
+int nightFilterEnabled = BLUfxPresets[PRESET_DEFAULT].nightFilterEnabled;
+float nightFilterStrength = BLUfxPresets[PRESET_DEFAULT].nightFilterStrength;
+
+// Session-only per-section bypass flags:
+bool sBypassTone = false;
+bool sBypassRgb = false;
+bool sBypassOptics = false;
+
 static inline bool FloatNear(float a, float b, float eps = 0.0005f)
 {
     return (a - b < eps) && (b - a < eps);
+}
+
+static void CaptureCurrentToPreset(BLUfxPreset& dst)
+{
+    dst.brightness = brightness;
+    dst.contrast = contrast;
+    dst.saturation = saturation;
+    dst.redScale = redScale;
+    dst.greenScale = greenScale;
+    dst.blueScale = blueScale;
+    dst.redOffset = redOffset;
+    dst.greenOffset = greenOffset;
+    dst.blueOffset = blueOffset;
+    dst.vignette = vignette;
+    dst.raleighScale = raleighScale;
+    dst.maxFps = maxFps;
+    dst.disableCinemaVeriteTime = disableCinemaVeriteTime;
+    dst.shadows = shadows;
+    dst.highlights = highlights;
+    dst.gammaVal = gammaVal;
+    dst.temperature = temperature;
+    dst.tint = tint;
+    dst.vibrance = vibrance;
+    dst.sharpen = sharpen;
+    dst.filmGrain = filmGrain;
+    dst.filmicRolloff = filmicRolloff;
+    dst.nightFilterEnabled = nightFilterEnabled;
+    dst.nightFilterStrength = nightFilterStrength;
+}
+
+static void RestoreFromPreset(const BLUfxPreset& src)
+{
+    brightness  = src.brightness;
+    contrast    = src.contrast;
+    saturation  = src.saturation;
+    redScale    = src.redScale;
+    greenScale  = src.greenScale;
+    blueScale   = src.blueScale;
+    redOffset   = src.redOffset;
+    greenOffset = src.greenOffset;
+    blueOffset  = src.blueOffset;
+    vignette    = src.vignette;
+    shadows     = src.shadows;
+    highlights  = src.highlights;
+    gammaVal    = src.gammaVal;
+    temperature = src.temperature;
+    tint        = src.tint;
+    vibrance    = src.vibrance;
+    sharpen     = src.sharpen;
+    filmGrain   = src.filmGrain;
+    filmicRolloff = src.filmicRolloff;
+    nightFilterEnabled = src.nightFilterEnabled;
+    nightFilterStrength = src.nightFilterStrength;
 }
 
 // Determines whether a given BLUfxPreset matches the current settings globals:
@@ -522,7 +663,18 @@ bool isActivePreset(const BLUfxPreset_t* preset)
             (IS_XP12 || FloatNear(preset->raleighScale, raleighScale)) &&
             FloatNear(preset->redOffset, redOffset) &&
             FloatNear(preset->redScale, redScale) &&
-            FloatNear(preset->vignette, vignette));
+            FloatNear(preset->vignette, vignette) &&
+            FloatNear(preset->shadows, shadows) &&
+            FloatNear(preset->highlights, highlights) &&
+            FloatNear(preset->gammaVal, gammaVal) &&
+            FloatNear(preset->temperature, temperature) &&
+            FloatNear(preset->tint, tint) &&
+            FloatNear(preset->vibrance, vibrance) &&
+            FloatNear(preset->sharpen, sharpen) &&
+            FloatNear(preset->filmGrain, filmGrain) &&
+            (preset->filmicRolloff == filmicRolloff) &&
+            (preset->nightFilterEnabled == nightFilterEnabled) &&
+            (!nightFilterEnabled || FloatNear(preset->nightFilterStrength, nightFilterStrength)));
 }
 
 void ApplyPreset(int presetIdx)
@@ -533,16 +685,7 @@ void ApplyPreset(int presetIdx)
     if (presetIdx == PRESET_DEFAULT || presetIdx == PRESET_USER)
         ClearPrePresetScratchpad();
 
-    brightness  = BLUfxPresets[presetIdx].brightness;
-    contrast    = BLUfxPresets[presetIdx].contrast;
-    saturation  = BLUfxPresets[presetIdx].saturation;
-    redScale    = BLUfxPresets[presetIdx].redScale;
-    greenScale  = BLUfxPresets[presetIdx].greenScale;
-    blueScale   = BLUfxPresets[presetIdx].blueScale;
-    redOffset   = BLUfxPresets[presetIdx].redOffset;
-    greenOffset = BLUfxPresets[presetIdx].greenOffset;
-    blueOffset  = BLUfxPresets[presetIdx].blueOffset;
-    vignette    = BLUfxPresets[presetIdx].vignette;
+    RestoreFromPreset(BLUfxPresets[presetIdx]);
     if (presetIdx == PRESET_DEFAULT || presetIdx == PRESET_USER) {
         raleighScale = BLUfxPresets[presetIdx].raleighScale;
         if (postProcesssingEnabled || sMomentaryFullView) {
@@ -635,41 +778,60 @@ static int PostProcessingCallback(XPLMDrawingPhase inPhase, int inIsBefore, void
 
     glUseProgram(program);
 
-    int brightnessLocation = glGetUniformLocation(program, "brightness");
-    glUniform1f(brightnessLocation, brightness);
+    const float effBrightness  = sBypassTone   ? 0.0f : brightness;
+    const float effContrast    = sBypassTone   ? 1.0f : contrast;
+    const float effSaturation  = sBypassTone   ? 1.0f : saturation;
+    const float effShadows     = sBypassTone   ? 0.0f : shadows;
+    const float effHighlights  = sBypassTone   ? 0.0f : highlights;
+    const float effGamma       = sBypassTone   ? 1.0f : gammaVal;
+    const float effTemperature = sBypassTone   ? 0.0f : temperature;
+    const float effTint        = sBypassTone   ? 0.0f : tint;
+    const float effVibrance    = sBypassTone   ? 0.0f : vibrance;
 
-    int contrastLocation = glGetUniformLocation(program, "contrast");
-    glUniform1f(contrastLocation, contrast);
+    const float effRedScale    = sBypassRgb    ? 0.0f : redScale;
+    const float effGreenScale  = sBypassRgb    ? 0.0f : greenScale;
+    const float effBlueScale   = sBypassRgb    ? 0.0f : blueScale;
+    const float effRedOffset   = sBypassRgb    ? 0.0f : redOffset;
+    const float effGreenOffset = sBypassRgb    ? 0.0f : greenOffset;
+    const float effBlueOffset  = sBypassRgb    ? 0.0f : blueOffset;
 
-    int saturationLocation = glGetUniformLocation(program, "saturation");
-    glUniform1f(saturationLocation, saturation);
+    const float effVignette    = sBypassOptics ? 0.0f : vignette;
+    const float effSharpen     = sBypassOptics ? 0.0f : sharpen;
+    const float effFilmGrain   = sBypassOptics ? 0.0f : filmGrain;
+    const float effFilmic      = (sBypassOptics || !filmicRolloff) ? 0.0f : 1.0f;
+    const float effNightFilter = (sBypassOptics || !nightFilterEnabled) ? 0.0f : nightFilterStrength;
 
-    int redScaleLocation = glGetUniformLocation(program, "redScale");
-    glUniform1f(redScaleLocation, redScale);
+    static float sGrainFrameCounter = 0.0f;
+    if (effFilmGrain > 0.001f) {
+        sGrainFrameCounter += 1.0f;
+        if (sGrainFrameCounter > 1000.0f) sGrainFrameCounter = 0.0f;
+    }
 
-    int greenScaleLocation = glGetUniformLocation(program, "greenScale");
-    glUniform1f(greenScaleLocation, greenScale);
+    glUniform1f(glGetUniformLocation(program, "brightness"), effBrightness);
+    glUniform1f(glGetUniformLocation(program, "contrast"), effContrast);
+    glUniform1f(glGetUniformLocation(program, "saturation"), effSaturation);
+    glUniform1f(glGetUniformLocation(program, "shadows"), effShadows);
+    glUniform1f(glGetUniformLocation(program, "highlights"), effHighlights);
+    glUniform1f(glGetUniformLocation(program, "gammaVal"), effGamma);
+    glUniform1f(glGetUniformLocation(program, "temperature"), effTemperature);
+    glUniform1f(glGetUniformLocation(program, "tint"), effTint);
+    glUniform1f(glGetUniformLocation(program, "vibrance"), effVibrance);
 
-    int blueScaleLocation = glGetUniformLocation(program, "blueScale");
-    glUniform1f(blueScaleLocation, blueScale);
+    glUniform1f(glGetUniformLocation(program, "redScale"), effRedScale);
+    glUniform1f(glGetUniformLocation(program, "greenScale"), effGreenScale);
+    glUniform1f(glGetUniformLocation(program, "blueScale"), effBlueScale);
+    glUniform1f(glGetUniformLocation(program, "redOffset"), effRedOffset);
+    glUniform1f(glGetUniformLocation(program, "greenOffset"), effGreenOffset);
+    glUniform1f(glGetUniformLocation(program, "blueOffset"), effBlueOffset);
 
-    int redOffsetLocation = glGetUniformLocation(program, "redOffset");
-    glUniform1f(redOffsetLocation, redOffset);
-
-    int greenOffsetLocation = glGetUniformLocation(program, "greenOffset");
-    glUniform1f(greenOffsetLocation, greenOffset);
-
-    int blueOffsetLocation = glGetUniformLocation(program, "blueOffset");
-    glUniform1f(blueOffsetLocation, blueOffset);
-
-    int resolutionLocation = glGetUniformLocation(program, "resolution");
-    glUniform2f(resolutionLocation, (float) x, (float) y);
-
-    int vignetteLocation = glGetUniformLocation(program, "vignette");
-    glUniform1f(vignetteLocation, vignette);
-
-    int sceneLocation = glGetUniformLocation(program, "scene");
-    glUniform1i(sceneLocation, 0);
+    glUniform2f(glGetUniformLocation(program, "resolution"), (float) x, (float) y);
+    glUniform1f(glGetUniformLocation(program, "vignette"), effVignette);
+    glUniform1f(glGetUniformLocation(program, "sharpen"), effSharpen);
+    glUniform1f(glGetUniformLocation(program, "filmGrain"), effFilmGrain);
+    glUniform1f(glGetUniformLocation(program, "filmicRolloff"), effFilmic);
+    glUniform1f(glGetUniformLocation(program, "nightFilter"), effNightFilter);
+    glUniform1f(glGetUniformLocation(program, "frameSeed"), sGrainFrameCounter);
+    glUniform1i(glGetUniformLocation(program, "scene"), 0);
 
     glPushAttrib(GL_VIEWPORT_BIT | GL_ENABLE_BIT);
     glMatrixMode(GL_PROJECTION);
@@ -682,42 +844,167 @@ static int PostProcessingCallback(XPLMDrawingPhase inPhase, int inIsBefore, void
     glViewport(0, 0, x, y);
 
     int settingsWindowOpen = (g_SettingsWindow && g_SettingsWindow->GetVisible()) ? 1 : 0;
+    bool isSplitActive = (settingsWindowOpen && sPreviewMode == PREVIEW_MODE_SPLIT && !sMomentaryFullView);
     float splitFrac = 0.0f;
-    if (settingsWindowOpen && sPreviewMode == PREVIEW_MODE_SPLIT && !sMomentaryFullView) {
+    if (isSplitActive) {
         splitFrac = (sPreviewSplitPosition < 0.05f) ? 0.05f : ((sPreviewSplitPosition > 0.95f) ? 0.95f : sPreviewSplitPosition);
     }
 
     glColor3f(1.0f, 1.0f, 1.0f);
     glBegin(GL_QUADS);
-    glTexCoord2f(splitFrac, 0.0f);
-    glVertex2f((GLfloat)(x * splitFrac), 0.0f);
-    glTexCoord2f(splitFrac, 1.0f);
-    glVertex2f((GLfloat)(x * splitFrac), (GLfloat)y);
-    glTexCoord2f(1.0f, 1.0f);
-    glVertex2f((GLfloat)x, (GLfloat)y);
-    glTexCoord2f(1.0f, 0.0f);
-    glVertex2f((GLfloat)x, 0.0f);
+    if (isSplitActive && sPreviewSplitOrientation == SPLIT_ORIENT_HORIZONTAL) {
+        // Horizontal split boundary sits at y * (1 - splitFrac) from bottom (i.e. splitFrac down from top)
+        float boundaryFrac = 1.0f - splitFrac;
+        if (!sPreviewSplitFlipped) {
+            // Raw on top, active BLU-fx grade on bottom (0 .. boundaryFrac)
+            glTexCoord2f(0.0f, 0.0f);
+            glVertex2f(0.0f, 0.0f);
+            glTexCoord2f(0.0f, boundaryFrac);
+            glVertex2f(0.0f, (GLfloat)(y * boundaryFrac));
+            glTexCoord2f(1.0f, boundaryFrac);
+            glVertex2f((GLfloat)x, (GLfloat)(y * boundaryFrac));
+            glTexCoord2f(1.0f, 0.0f);
+            glVertex2f((GLfloat)x, 0.0f);
+        } else {
+            // Active BLU-fx grade on top (boundaryFrac .. 1.0), raw on bottom
+            glTexCoord2f(0.0f, boundaryFrac);
+            glVertex2f(0.0f, (GLfloat)(y * boundaryFrac));
+            glTexCoord2f(0.0f, 1.0f);
+            glVertex2f(0.0f, (GLfloat)y);
+            glTexCoord2f(1.0f, 1.0f);
+            glVertex2f((GLfloat)x, (GLfloat)y);
+            glTexCoord2f(1.0f, boundaryFrac);
+            glVertex2f((GLfloat)x, (GLfloat)(y * boundaryFrac));
+        }
+    } else if (isSplitActive && sPreviewSplitFlipped) {
+        // Vertical split flipped: active BLU-fx grade on left (0 .. splitFrac), raw on right
+        glTexCoord2f(0.0f, 0.0f);
+        glVertex2f(0.0f, 0.0f);
+        glTexCoord2f(0.0f, 1.0f);
+        glVertex2f(0.0f, (GLfloat)y);
+        glTexCoord2f(splitFrac, 1.0f);
+        glVertex2f((GLfloat)(x * splitFrac), (GLfloat)y);
+        glTexCoord2f(splitFrac, 0.0f);
+        glVertex2f((GLfloat)(x * splitFrac), 0.0f);
+    } else {
+        // Vertical split (or full screen when splitFrac == 0): raw on left, active grade on right
+        glTexCoord2f(splitFrac, 0.0f);
+        glVertex2f((GLfloat)(x * splitFrac), 0.0f);
+        glTexCoord2f(splitFrac, 1.0f);
+        glVertex2f((GLfloat)(x * splitFrac), (GLfloat)y);
+        glTexCoord2f(1.0f, 1.0f);
+        glVertex2f((GLfloat)x, (GLfloat)y);
+        glTexCoord2f(1.0f, 0.0f);
+        glVertex2f((GLfloat)x, 0.0f);
+    }
     glEnd();
 
-    // Optional vertical divider hairline at the split boundary:
-    if (settingsWindowOpen && sPreviewMode == PREVIEW_MODE_SPLIT && !sMomentaryFullView && sShowSplitDivider && splitFrac > 0.01f && splitFrac < 0.99f) {
+    // Optional divider hairline + embossed RAW / BLU-fx legend badges at the split boundary:
+    bool drawSplitBadges = (isSplitActive && sShowSplitDivider && splitFrac > 0.01f && splitFrac < 0.99f);
+    float rawTextX = 0.0f, rawTextY = 0.0f;
+    float fxTextX  = 0.0f, fxTextY  = 0.0f;
+
+    if (drawSplitBadges) {
         glUseProgram(0);
         glDisable(GL_TEXTURE_2D);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        GLfloat divX = (GLfloat)(x * splitFrac);
         glLineWidth(1.0f);
         glBegin(GL_LINES);
-        // Soft dark shadow line immediately to the left for contrast against bright scenes:
-        glColor4f(0.0f, 0.0f, 0.0f, 0.35f);
-        glVertex2f(divX - 1.0f, 0.0f);
-        glVertex2f(divX - 1.0f, (GLfloat)y);
-        // Crisp translucent white hairline:
-        glColor4f(1.0f, 1.0f, 1.0f, 0.65f);
-        glVertex2f(divX, 0.0f);
-        glVertex2f(divX, (GLfloat)y);
+        if (sPreviewSplitOrientation == SPLIT_ORIENT_HORIZONTAL) {
+            GLfloat divY = (GLfloat)(y * (1.0f - splitFrac));
+            glColor4f(0.0f, 0.0f, 0.0f, 0.35f);
+            glVertex2f(0.0f, divY + 1.0f);
+            glVertex2f((GLfloat)x, divY + 1.0f);
+            glColor4f(1.0f, 1.0f, 1.0f, 0.65f);
+            glVertex2f(0.0f, divY);
+            glVertex2f((GLfloat)x, divY);
+        } else {
+            GLfloat divX = (GLfloat)(x * splitFrac);
+            // Soft dark shadow line immediately to the left for contrast against bright scenes:
+            glColor4f(0.0f, 0.0f, 0.0f, 0.35f);
+            glVertex2f(divX - 1.0f, 0.0f);
+            glVertex2f(divX - 1.0f, (GLfloat)y);
+            // Crisp translucent white hairline:
+            glColor4f(1.0f, 1.0f, 1.0f, 0.65f);
+            glVertex2f(divX, 0.0f);
+            glVertex2f(divX, (GLfloat)y);
+        }
         glEnd();
+
+        // Measure proportional font labels for RAW and BLU-fx badges:
+        int fontH = 10;
+        XPLMGetFontDimensions(xplmFont_Proportional, NULL, &fontH, NULL);
+        const float rawW = XPLMMeasureString(xplmFont_Proportional, "RAW", 3);
+        const float fxW  = XPLMMeasureString(xplmFont_Proportional, "BLU-fx", 6);
+        const float padX = 7.0f;
+        const float padY = 4.0f;
+        const float pillH = (float)fontH + padY * 2.0f;
+        const float rawPillW = rawW + padX * 2.0f;
+        const float fxPillW  = fxW  + padX * 2.0f;
+        const float gapFromLine = 8.0f;
+
+        float rawBoxL = 0.0f, rawBoxB = 0.0f;
+        float fxBoxL  = 0.0f, fxBoxB  = 0.0f;
+
+        if (sPreviewSplitOrientation == SPLIT_ORIENT_HORIZONTAL) {
+            float divY = (float)y * (1.0f - splitFrac);
+            float centerX = (float)x * 0.5f;
+            float topB = divY + gapFromLine;
+            float botB = divY - gapFromLine - pillH;
+            if (topB + pillH > (float)y - 24.0f) topB = (float)y - 24.0f - pillH;
+            if (botB < 12.0f) botB = 12.0f;
+            if (!sPreviewSplitFlipped) {
+                rawBoxL = centerX - rawPillW * 0.5f; rawBoxB = topB;
+                fxBoxL  = centerX - fxPillW * 0.5f;  fxBoxB  = botB;
+            } else {
+                fxBoxL  = centerX - fxPillW * 0.5f;  fxBoxB  = topB;
+                rawBoxL = centerX - rawPillW * 0.5f; rawBoxB = botB;
+            }
+        } else {
+            float divX = (float)x * splitFrac;
+            float baseB = (float)y - 54.0f - pillH;
+            if (baseB < 20.0f) baseB = 20.0f;
+            if (!sPreviewSplitFlipped) {
+                rawBoxL = divX - gapFromLine - rawPillW; rawBoxB = baseB;
+                fxBoxL  = divX + gapFromLine;            fxBoxB  = baseB;
+            } else {
+                fxBoxL  = divX - gapFromLine - fxPillW;  fxBoxB  = baseB;
+                rawBoxL = divX + gapFromLine;            rawBoxB = baseB;
+            }
+            if (rawBoxL < 8.0f) rawBoxL = 8.0f;
+            if (rawBoxL + rawPillW > (float)x - 8.0f) rawBoxL = (float)x - 8.0f - rawPillW;
+            if (fxBoxL < 8.0f) fxBoxL = 8.0f;
+            if (fxBoxL + fxPillW > (float)x - 8.0f) fxBoxL = (float)x - 8.0f - fxPillW;
+        }
+
+        auto drawPillBox = [](float l, float b, float w, float h, float br, float bg, float bb, float ba) {
+            // Subtle dark translucent backing plate:
+            glColor4f(0.06f, 0.08f, 0.12f, 0.60f);
+            glBegin(GL_QUADS);
+            glVertex2f(l,     b);
+            glVertex2f(l,     b + h);
+            glVertex2f(l + w, b + h);
+            glVertex2f(l + w, b);
+            glEnd();
+            // Crisp 1px accent outline:
+            glColor4f(br, bg, bb, ba);
+            glBegin(GL_LINE_LOOP);
+            glVertex2f(l + 0.5f,     b + 0.5f);
+            glVertex2f(l + 0.5f,     b + h - 0.5f);
+            glVertex2f(l + w - 0.5f, b + h - 0.5f);
+            glVertex2f(l + w - 0.5f, b + 0.5f);
+            glEnd();
+        };
+
+        drawPillBox(rawBoxL, rawBoxB, rawPillW, pillH, 0.78f, 0.82f, 0.88f, 0.45f);
+        drawPillBox(fxBoxL,  fxBoxB,  fxPillW,  pillH, 0.32f, 0.74f, 1.00f, 0.80f);
+
+        rawTextX = rawBoxL + padX;
+        rawTextY = rawBoxB + padY + 1.0f;
+        fxTextX  = fxBoxL  + padX;
+        fxTextY  = fxBoxB  + padY + 1.0f;
     }
 
     glMatrixMode(GL_PROJECTION);
@@ -727,6 +1014,13 @@ static int PostProcessingCallback(XPLMDrawingPhase inPhase, int inIsBefore, void
     glPopAttrib();
 
     glUseProgram(0);
+
+    if (drawSplitBadges) {
+        float rawCol[3] = { 0.86f, 0.89f, 0.94f };
+        float fxCol[3]  = { 0.52f, 0.88f, 1.00f };
+        XPLMDrawString(rawCol, (int)rawTextX, (int)rawTextY, "RAW", NULL, xplmFont_Proportional);
+        XPLMDrawString(fxCol,  (int)fxTextX,  (int)fxTextY,  "BLU-fx", NULL, xplmFont_Proportional);
+    }
 
     return 1;
 }
@@ -947,19 +1241,7 @@ static bool sHasDiskSnapshot = false;
 
 void UpdateDiskSnapshot(void)
 {
-    sDiskPreset.brightness = brightness;
-    sDiskPreset.contrast = contrast;
-    sDiskPreset.saturation = saturation;
-    sDiskPreset.redScale = redScale;
-    sDiskPreset.greenScale = greenScale;
-    sDiskPreset.blueScale = blueScale;
-    sDiskPreset.redOffset = redOffset;
-    sDiskPreset.greenOffset = greenOffset;
-    sDiskPreset.blueOffset = blueOffset;
-    sDiskPreset.vignette = vignette;
-    sDiskPreset.raleighScale = raleighScale;
-    sDiskPreset.maxFps = maxFps;
-    sDiskPreset.disableCinemaVeriteTime = disableCinemaVeriteTime;
+    CaptureCurrentToPreset(sDiskPreset);
     sHasDiskSnapshot = true;
 }
 
@@ -975,19 +1257,7 @@ static bool sHasDiscardedPreset = false;
 
 void CaptureDiscardedPreset(void)
 {
-    sLastDiscardedPreset.brightness = brightness;
-    sLastDiscardedPreset.contrast = contrast;
-    sLastDiscardedPreset.saturation = saturation;
-    sLastDiscardedPreset.redScale = redScale;
-    sLastDiscardedPreset.greenScale = greenScale;
-    sLastDiscardedPreset.blueScale = blueScale;
-    sLastDiscardedPreset.redOffset = redOffset;
-    sLastDiscardedPreset.greenOffset = greenOffset;
-    sLastDiscardedPreset.blueOffset = blueOffset;
-    sLastDiscardedPreset.vignette = vignette;
-    sLastDiscardedPreset.raleighScale = raleighScale;
-    sLastDiscardedPreset.maxFps = maxFps;
-    sLastDiscardedPreset.disableCinemaVeriteTime = disableCinemaVeriteTime;
+    CaptureCurrentToPreset(sLastDiscardedPreset);
     sHasDiscardedPreset = true;
 }
 
@@ -1000,16 +1270,7 @@ void RestoreDiscardedPreset(void)
 {
     if (!sHasDiscardedPreset)
         return;
-    brightness  = sLastDiscardedPreset.brightness;
-    contrast    = sLastDiscardedPreset.contrast;
-    saturation  = sLastDiscardedPreset.saturation;
-    redScale    = sLastDiscardedPreset.redScale;
-    greenScale  = sLastDiscardedPreset.greenScale;
-    blueScale   = sLastDiscardedPreset.blueScale;
-    redOffset   = sLastDiscardedPreset.redOffset;
-    greenOffset = sLastDiscardedPreset.greenOffset;
-    blueOffset  = sLastDiscardedPreset.blueOffset;
-    vignette    = sLastDiscardedPreset.vignette;
+    RestoreFromPreset(sLastDiscardedPreset);
     raleighScale = sLastDiscardedPreset.raleighScale;
     UpdateRaleighScale(0);
 }
@@ -1019,19 +1280,7 @@ static bool sHasPrePreset = false;
 
 void SavePrePresetScratchpad(void)
 {
-    sPrePresetPreset.brightness = brightness;
-    sPrePresetPreset.contrast = contrast;
-    sPrePresetPreset.saturation = saturation;
-    sPrePresetPreset.redScale = redScale;
-    sPrePresetPreset.greenScale = greenScale;
-    sPrePresetPreset.blueScale = blueScale;
-    sPrePresetPreset.redOffset = redOffset;
-    sPrePresetPreset.greenOffset = greenOffset;
-    sPrePresetPreset.blueOffset = blueOffset;
-    sPrePresetPreset.vignette = vignette;
-    sPrePresetPreset.raleighScale = raleighScale;
-    sPrePresetPreset.maxFps = maxFps;
-    sPrePresetPreset.disableCinemaVeriteTime = disableCinemaVeriteTime;
+    CaptureCurrentToPreset(sPrePresetPreset);
     sHasPrePreset = true;
 }
 
@@ -1039,16 +1288,7 @@ void RestorePrePresetScratchpad(void)
 {
     if (!sHasPrePreset)
         return;
-    brightness  = sPrePresetPreset.brightness;
-    contrast    = sPrePresetPreset.contrast;
-    saturation  = sPrePresetPreset.saturation;
-    redScale    = sPrePresetPreset.redScale;
-    greenScale  = sPrePresetPreset.greenScale;
-    blueScale   = sPrePresetPreset.blueScale;
-    redOffset   = sPrePresetPreset.redOffset;
-    greenOffset = sPrePresetPreset.greenOffset;
-    blueOffset  = sPrePresetPreset.blueOffset;
-    vignette    = sPrePresetPreset.vignette;
+    RestoreFromPreset(sPrePresetPreset);
     raleighScale = sPrePresetPreset.raleighScale;
     UpdateRaleighScale(0);
     sHasPrePreset = false;
@@ -1083,6 +1323,8 @@ float sDocViewerOpacity = 0.80f;
 int sDocViewerTransparent = 1;
 int sPreviewMode = PREVIEW_MODE_SPLIT;
 float sPreviewSplitPosition = 0.50f;
+int sPreviewSplitOrientation = SPLIT_ORIENT_VERTICAL;
+bool sPreviewSplitFlipped = false;
 bool sMomentaryFullView = false;
 bool sShowSplitDivider = true;
 
@@ -1160,6 +1402,8 @@ bool SavePreferences(void)
     }
     fprintf(fp, "previewMode=%s\n", (sPreviewMode == PREVIEW_MODE_FULL ? "full" : "split"));
     fprintf(fp, "previewSplit=%.2f\n", sPreviewSplitPosition);
+    fprintf(fp, "previewOrientation=%s\n", (sPreviewSplitOrientation == SPLIT_ORIENT_HORIZONTAL ? "horizontal" : "vertical"));
+    fprintf(fp, "previewFlipped=%d\n", (sPreviewSplitFlipped ? 1 : 0));
     fprintf(fp, "previewDivider=%d\n", (sShowSplitDivider ? 1 : 0));
     int effectiveMaxFps = (fpsLimiterEnabled && maxFps > 0.0f) ? (int)maxFps : 0;
     fprintf(fp, "maxFps=%d\n", effectiveMaxFps);
@@ -1256,6 +1500,10 @@ bool LoadPreferences(void)
             sPreviewSplitPosition = (float)atof(val);
             if (sPreviewSplitPosition < 0.05f) sPreviewSplitPosition = 0.05f;
             if (sPreviewSplitPosition > 0.95f) sPreviewSplitPosition = 0.95f;
+        } else if (strcmp(key, "previewOrientation") == 0) {
+            sPreviewSplitOrientation = (strcmp(val, "horizontal") == 0) ? SPLIT_ORIENT_HORIZONTAL : SPLIT_ORIENT_VERTICAL;
+        } else if (strcmp(key, "previewFlipped") == 0) {
+            sPreviewSplitFlipped = (atoi(val) != 0);
         } else if (strcmp(key, "previewDivider") == 0) {
             sShowSplitDivider = (atoi(val) != 0);
         } else if (strcmp(key, "maxFps") == 0) {
@@ -1293,12 +1541,8 @@ void MigrateLegacyConfigIfNeeded(void)
             // from the root blu_fx.ini before backing it up to blu_fx_backup.ini:
             if (stat(destProfile.c_str(), &st) == 0) {
                 LoadSettingsFromFile(destProfile);
-                BLUfxPreset existingProf = {
-                    brightness, contrast, saturation,
-                    redScale, greenScale, blueScale,
-                    redOffset, greenOffset, blueOffset,
-                    vignette, raleighScale, maxFps, disableCinemaVeriteTime
-                };
+                BLUfxPreset existingProf;
+                CaptureCurrentToPreset(existingProf);
                 LoadSettingsFromFile(CONFIG_PATH);
                 if (!isActivePreset(&existingProf)) {
                     std::string backupProfile = std::string(PROFILES_PATH) + "/blu_fx_backup.ini";
@@ -1377,6 +1621,17 @@ bool SaveSettingsToFile(const std::string& path)
     fprintf(fp, "blueOffset=%.2f\n", blueOffset);
     fprintf(fp, "vignette=%.2f\n", vignette);
     fprintf(fp, "raleighScale=%.1f\n", raleighScale);
+    fprintf(fp, "shadows=%.2f\n", shadows);
+    fprintf(fp, "highlights=%.2f\n", highlights);
+    fprintf(fp, "gamma=%.2f\n", gammaVal);
+    fprintf(fp, "temperature=%.2f\n", temperature);
+    fprintf(fp, "tint=%.2f\n", tint);
+    fprintf(fp, "vibrance=%.2f\n", vibrance);
+    fprintf(fp, "sharpen=%.2f\n", sharpen);
+    fprintf(fp, "filmGrain=%.2f\n", filmGrain);
+    fprintf(fp, "filmicRolloff=%d\n", filmicRolloff);
+    fprintf(fp, "nightFilterEnabled=%d\n", nightFilterEnabled);
+    fprintf(fp, "nightFilterStrength=%.2f\n", nightFilterStrength);
     fclose(fp);
 
     // Optional legacy mirror to root blu_fx.ini for v1.x downgrade safety:
@@ -1394,6 +1649,20 @@ bool LoadSettingsFromFile(const std::string& path)
 
     FILE* fp = fopen(path.c_str(), "r");
     if (!fp) return false;
+
+    // Reset v2.1 extended adjustments to neutral defaults before reading so loading older
+    // v1.x / v2.0 .ini profiles never retains stale extended settings from a previous profile:
+    shadows = 0.0f;
+    highlights = 0.0f;
+    gammaVal = DEFAULT_GAMMA;
+    temperature = 0.0f;
+    tint = 0.0f;
+    vibrance = 0.0f;
+    sharpen = 0.0f;
+    filmGrain = 0.0f;
+    filmicRolloff = 0;
+    nightFilterEnabled = 0;
+    nightFilterStrength = DEFAULT_NIGHT_FILTER_STRENGTH;
 
     char lineBuf[1024];
     while (fgets(lineBuf, sizeof(lineBuf), fp)) {
@@ -1434,6 +1703,17 @@ bool LoadSettingsFromFile(const std::string& path)
         else if (strcmp(key, "blueOffset") == 0) blueOffset = (float)atof(val);
         else if (strcmp(key, "vignette") == 0) vignette = (float)atof(val);
         else if (strcmp(key, "raleighScale") == 0) raleighScale = (float)atof(val);
+        else if (strcmp(key, "shadows") == 0) shadows = (float)atof(val);
+        else if (strcmp(key, "highlights") == 0) highlights = (float)atof(val);
+        else if (strcmp(key, "gamma") == 0) gammaVal = (float)atof(val);
+        else if (strcmp(key, "temperature") == 0) temperature = (float)atof(val);
+        else if (strcmp(key, "tint") == 0) tint = (float)atof(val);
+        else if (strcmp(key, "vibrance") == 0) vibrance = (float)atof(val);
+        else if (strcmp(key, "sharpen") == 0) sharpen = (float)atof(val);
+        else if (strcmp(key, "filmGrain") == 0) filmGrain = (float)atof(val);
+        else if (strcmp(key, "filmicRolloff") == 0) filmicRolloff = atoi(val) ? 1 : 0;
+        else if (strcmp(key, "nightFilterEnabled") == 0) nightFilterEnabled = atoi(val) ? 1 : 0;
+        else if (strcmp(key, "nightFilterStrength") == 0) nightFilterStrength = (float)atof(val);
         else if (strcmp(key, "postProcesssingEnabled") == 0 || strcmp(key, "postProcessingEnabled") == 0) postProcesssingEnabled = atoi(val);
         else if (strcmp(key, "fpsLimiterEnabled") == 0) fpsLimiterEnabled = atoi(val);
         else if (strcmp(key, "maxFps") == 0) maxFps = (float)atof(val);
@@ -1512,19 +1792,7 @@ void LoadSettings(void)
         sSessionInitialProfile = sActiveProfileName;
 
         // copies to User preset attached to Restore button
-        BLUfxPresets[PRESET_USER].brightness = brightness;
-        BLUfxPresets[PRESET_USER].contrast = contrast;
-        BLUfxPresets[PRESET_USER].saturation = saturation;
-        BLUfxPresets[PRESET_USER].redScale = redScale;
-        BLUfxPresets[PRESET_USER].greenScale = greenScale;
-        BLUfxPresets[PRESET_USER].blueScale = blueScale;
-        BLUfxPresets[PRESET_USER].redOffset = redOffset;
-        BLUfxPresets[PRESET_USER].greenOffset = greenOffset;
-        BLUfxPresets[PRESET_USER].blueOffset = blueOffset;
-        BLUfxPresets[PRESET_USER].vignette = vignette;
-        BLUfxPresets[PRESET_USER].raleighScale = raleighScale;
-        BLUfxPresets[PRESET_USER].maxFps = maxFps;
-        BLUfxPresets[PRESET_USER].disableCinemaVeriteTime = disableCinemaVeriteTime;
+        CaptureCurrentToPreset(BLUfxPresets[PRESET_USER]);
     }
 
     // Downgrade mirror management: ensure root blu_fx.ini exists if mirroring is active,
