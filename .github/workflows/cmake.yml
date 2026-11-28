@@ -3,6 +3,12 @@ name: "CMake: Build and create .zip bundle"
 on:
   push:
   workflow_call:
+    inputs:
+      notarize_mac:
+        description: "Sign and notarize macOS binary with Apple Developer ID"
+        required: false
+        type: boolean
+        default: true
     outputs:
       blufx_version:
         description: "Version string parsed from blu_fx.h"
@@ -117,7 +123,7 @@ jobs:
           fi
 
       - name: Sign & Notarize macOS Universal Binary (Apple Developer ID)
-        if: github.event_name == 'workflow_call'
+        if: inputs.notarize_mac == true
         env:
           MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
           MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
@@ -195,7 +201,7 @@ jobs:
           echo "Apple notarization ACCEPTED (submission id: $SUB_ID)!"
 
       - name: Clean up temporary signing keychain
-        if: always() && github.event_name == 'workflow_call'
+        if: always() && inputs.notarize_mac == true
         run: |
           rm -f "$RUNNER_TEMP/dev_id.p12" "$RUNNER_TEMP/blu_fx_notarize.zip" "$RUNNER_TEMP/notary_result.json" "$RUNNER_TEMP/notary_stderr.txt"
           security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true

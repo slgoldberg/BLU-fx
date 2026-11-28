@@ -61,6 +61,8 @@ jobs:
   build:
     needs: [preflight]
     uses: ./.github/workflows/cmake.yml
+    with:
+      notarize_mac: true
     secrets: inherit
 
   publish:
