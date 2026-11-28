@@ -1,1 +1,1 @@
-blu-fx_v2.0.0  (packaged on Wed Nov 25 08:37:16 UTC 2026)
+blu-fx_v2.1.0b1  (packaged on Sat Nov 28 05:20:45 UTC 2026)
