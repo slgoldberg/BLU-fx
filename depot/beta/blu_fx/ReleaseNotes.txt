@@ -1,3 +1,38 @@
+BLU-fx v2.1.0b1  (packaged on Fri Nov 27 2026)
+===============================================================================
+
+HIGHLIGHTS FOR THIS RELEASE (v2.1.0b1):
+
+  * Expanded Single-Pass Post-Processing Adjustments & Effects:
+    - Shadows & Highlights: Lift dark X-Plane 12 cockpits without blowing out
+      the sky, and recover bright cloud/glare detail without muddying shadows.
+    - Gamma: Smooth midtone luminance curve keeping pure blacks deep and whites crisp.
+    - Temperature & Tint: Single-slider warm/cool white balance and green/magenta
+      tint control with luminance preservation.
+    - Vibrance: Smart saturation that wakes up muted terrain and foliage while
+      protecting already-vivid skies and cockpit annunciators.
+    - Adaptive Sharpening (CAS-style): 5-tap contrast-adaptive sharpening for
+      crisper cockpit gauges and distant runways without white halos.
+    - Film Grain: Subtle animated procedural grain weighted toward midtones.
+    - Filmic Highlight Roll-off: Optional soft shoulder compression above 72%
+      luminance so boosting Contrast or Brightness won't clip bright clouds.
+    - Night-Room Filter: Quick on/off blue-light cut and glare dimmer with
+      adjustable Strength for dark-room night flights without disturbing your
+      daytime sliders.
+    - 100% backward-compatible with v1.x and v2.0.0 .ini profiles and presets.
+
+  * Streamlined Settings UI & Split-Screen Upgrades:
+    - Solo Accordion left column (Tone & Color, RGB Channels, Optics & Effects)
+      with live non-default summaries on collapsed headers and per-section
+      Bypass Eye toggles for instant A/B auditing of each group.
+    - Compact 3-column x 6-row Presets grid reclaiming vertical screen space,
+      plus instant exact-height reopen with zero shrink flash.
+    - Expanded Split-Screen Preview: cycle vertical/horizontal orientation and
+      flip Raw vs. BLU-fx sides, with on-screen RAW / BLU-fx badges straddling
+      the divider hairline (toggleable via the divider eye button).
+    - New controls carry a "New in v2.1" badge inside their hover tooltips.
+
+===============================================================================
 BLU-fx v2.0.0  (packaged on Wed Nov 25 2026)
 ===============================================================================
 
