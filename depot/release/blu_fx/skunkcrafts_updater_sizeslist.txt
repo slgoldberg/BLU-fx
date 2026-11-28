@@ -7,5 +7,5 @@ docs/images/blufx_hero_banner.jpg|902888
 docs/images/split_preview_demo.png|820429
 docs/images/ui_overview.png|565443
 lin_x64/blu_fx.xpl|3173592
-mac_x64/blu_fx.xpl|6600232
+mac_x64/blu_fx.xpl|6699600
 win_x64/blu_fx.xpl|6246147
